@@ -1,0 +1,354 @@
+// Industry-Standard E-commerce Schema - Final Corrected Version with All New Features
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextIndex"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------
+// Enums for Data Integrity
+// -------------------
+enum RoleType {
+  SUPER_ADMIN
+  ORDER_MANAGER
+  PRODUCT_MANAGER
+  CONTENT_MANAGER
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+// --- NEW: ContentType Enum ---
+enum ContentType {
+  TEXT
+  IMAGE_URL
+}
+
+// -------------------
+// User & Authentication Module
+// -------------------
+model User {
+  id        String          @id @default(uuid())
+  email     String          @unique
+  password  String
+  createdAt DateTime        @default(now())
+  profile   UserProfile?
+  addresses Address[]
+  orders    Order[]
+  reviews   ProductReview[]
+  cart      Cart?
+  passwordResetToken   String?   @unique
+  passwordResetExpires DateTime?
+}
+
+model UserProfile {
+  id     Int     @id @default(autoincrement())
+  userId String  @unique
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  phone  String?
+}
+
+model Address {
+  id          Int          @id @default(autoincrement())
+  userId      String?
+  user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullAddress String?      @db.Text
+  type        AddressType?
+  street      String?
+  city        String?
+  state       String?
+  postalCode  String?
+  country     String?
+  orders      Order[]
+}
+
+// -------------------
+// Admin Management Module
+// -------------------
+model AdminUser {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  name      String
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  roleId    Int
+  role      AdminRole @relation(fields: [roleId], references: [id])
+}
+
+model AdminRole {
+  id          Int         @id @default(autoincrement())
+  name        RoleType    @unique
+  permissions Json
+  admins      AdminUser[]
+}
+
+// -------------------
+// Product Catalog Module
+// -------------------
+model Product {
+  id            String            @id @default(uuid())
+  name          String
+  slug          String            @unique
+  description   String            @db.Text
+  short_description String?       @db.Text
+  regular_price Decimal           @db.Decimal(10, 2)
+  sale_price    Decimal?          @db.Decimal(10, 2)
+  status        ProductStatus     @default(DRAFT)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  supplierId    Int
+  supplier      Supplier          @relation(fields: [supplierId], references: [id])
+  categoryId    Int
+  category      Category          @relation(fields: [categoryId], references: [id])
+  inventory     ProductInventory?
+  images        ProductImage[]
+  reviews       ProductReview[]
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+
+  // --- NEW: Featured Flag ---
+  isFeatured Boolean @default(false)
+
+  // --- NEW: SEO Fields ---
+  seoTitle       String?
+  seoDescription String? @db.Text
+  seoKeywords    String?
+
+  // --- NEW: Related Products Relation ---
+  relatedProducts Product[] @relation("RelatedProducts")
+  relatedTo       Product[] @relation("RelatedProducts")
+
+  @@fulltext([name, description])
+}
+
+model Category {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique
+  slug     String     @unique
+  parentId Int?
+  parent   Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children Category[] @relation("SubCategories")
+  products Product[]
+
+  // --- NEW: Featured Flag & SEO Fields ---
+  isFeatured     Boolean @default(false)
+  seoTitle       String?
+  seoDescription String? @db.Text
+  seoKeywords    String?
+}
+
+model ProductInventory {
+  id        Int     @id @default(autoincrement())
+  productId String  @unique
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int     @default(0)
+  sku       String? @unique
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+
+  // --- NEW: Featured Flag ---
+  isFeatured Boolean @default(false)
+}
+
+model ProductReview {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// -------------------
+// Cart, Order & Promotions Modules
+// -------------------
+model Cart {
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  userId    String?    @unique
+  user      User?      @relation(fields: [userId], references: [id])
+  items     CartItem[]
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  quantity  Int
+  createdAt DateTime @default(now())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id                   Int            @id @default(autoincrement())
+  status               OrderStatus    @default(PENDING)
+  totalAmount          Decimal        @db.Decimal(10, 2)
+  createdAt            DateTime       @default(now())
+  customerName         String
+  customerPhone        String
+  customerEmail        String?
+  appliedPromotionCode String?
+  discountAmount       Decimal?       @db.Decimal(10, 2)
+  userId               String?
+  user                 User?          @relation(fields: [userId], references: [id])
+  addressId            Int
+  address              Address        @relation(fields: [addressId], references: [id])
+  orderItems           OrderItem[]
+  payment              PaymentDetail?
+  history              OrderHistory[]
+  ipAddress            String?
+}
+model OrderHistory {
+  id        Int         @id @default(autoincrement())
+  orderId   Int
+  order     Order       @relation(fields: [orderId], references: [id])
+  status    OrderStatus
+  comment   String?     @db.Text // Optional notes, e.g., "Shipped via Sundarban Courier"
+  createdAt DateTime    @default(now())
+}
+
+model OrderItem {
+  id          Int     @id @default(autoincrement())
+  quantity    Int
+  productName String
+  unitPrice   Decimal @db.Decimal(10, 2)
+  orderId     Int
+  order       Order   @relation(fields: [orderId], references: [id])
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onUpdate: NoAction, onDelete: Restrict)
+}
+
+model PaymentDetail {
+  id            Int           @id @default(autoincrement())
+  orderId       Int           @unique
+  order         Order         @relation(fields: [orderId], references: [id])
+  paymentMethod String
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  amount        Decimal       @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now())
+}
+
+model Supplier {
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  location     String
+  contactEmail String    @unique
+  products     Product[]
+}
+
+model Promotion {
+  id          Int           @id @default(autoincrement())
+  code        String        @unique
+  description String?
+  type        PromotionType
+  value       Decimal       @db.Decimal(10, 2)
+  startDate   DateTime
+  endDate     DateTime?
+  usageLimit  Int?
+  isActive    Boolean       @default(true)
+}
+
+// -------------------
+// NEW: Dynamic Content & Site Management Modules
+// -------------------
+model SiteContent {
+  id        Int         @id @default(autoincrement())
+  key       String      @unique
+  value     String      @db.Text
+  type      ContentType
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Menu {
+  id    Int        @id @default(autoincrement())
+  name  String     @unique
+  items MenuItem[]
+}
+
+model MenuItem {
+  id       Int        @id @default(autoincrement())
+  title    String
+  link     String
+  order    Int        @default(0)
+  menuId   Int
+  menu     Menu       @relation(fields: [menuId], references: [id])
+  parentId Int?
+  parent   MenuItem?  @relation("SubMenuItems", fields: [parentId], references: [id])
+  children MenuItem[] @relation("SubMenuItems")
+}
+
+model Testimonial {
+  id         Int      @id @default(autoincrement())
+  authorName String
+  content    String   @db.Text
+  rating     Int?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  actorType String
+  actorId   String
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+}
+
+model BlockedList {
+  id        Int      @id @default(autoincrement())
+  type      String
+  value     String   @unique
+  reason    String?
+  createdAt DateTime @default(now())
+}
