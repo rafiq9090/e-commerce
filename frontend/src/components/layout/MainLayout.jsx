@@ -1,13 +1,12 @@
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
-
 const MainLayout = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      {/* Outlet is a placeholder for the page content */}
-      <main className="flex-grow:1 p-4">
+     
+      <main className="flex-grow:1">
         <Outlet />
       </main>
       <Footer />

@@ -3,22 +3,33 @@ const express = require('express');
 const {
   placeOrder,
   getOrderHistory,
+  getOrderDetails,
   getAllOrders,
   updateOrderStatus,
-  trackOrder
+  trackOrderPublic,
+  trackOrderSecure,
+  cancelOrder,
+  getOrderStatistics
 } = require('../controllers/order.controller');
-const { authenticate, authorize , sofAuthenticate } = require('../middleware/auth.middleware');
+const { authenticate, authorize, sofAuthenticate } = require('../middleware/auth.middleware');
+
 const router = express.Router();
 
-// The checkout endpoint can now be used by guests OR logged-in users
+// PUBLIC ROUTES
+router.get('/track/:orderId', trackOrderPublic);
+router.post('/track/secure', trackOrderSecure);
+
+// CUSTOMER ROUTES (Guest + Authenticated)
 router.post('/', sofAuthenticate, placeOrder);
-router.post('/track', trackOrder);
 
-// --- Customer Routes ---
-router.get('/', authenticate,getOrderHistory)
+// AUTHENTICATED CUSTOMER ROUTES
+router.get('/my-orders', authenticate, getOrderHistory);
+router.get('/:id', authenticate, getOrderDetails);
+router.patch('/:id/cancel', authenticate, cancelOrder);
 
-// --- Admin-only Routes (require strict login and permissions) ---
-router.get('/admin/all', authenticate, authorize('can_manage_orders'), getAllOrders);
-router.put('/admin/:orderId/status', authenticate, authorize('can_manage_orders'), updateOrderStatus);
+// ADMIN ROUTES
+router.get('/admin/overview', authenticate, authorize('can_manage_orders'), getOrderStatistics);
+router.get('/admin/list', authenticate, authorize('can_manage_orders'), getAllOrders);
+router.put('/admin/:id/status', authenticate, authorize('can_manage_orders'), updateOrderStatus);
 
 module.exports = router;

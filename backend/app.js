@@ -3,6 +3,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const mainRouter = require('./src/routes/index');
 const { errorHandler } = require('./src/middleware/error.handler');
+const { swaggerUi, specs } = require("./src/config/swagger");
 
 const app = express();
 
@@ -23,6 +24,9 @@ app.use(cookieParser());
 // --- API Router ---
 // This must come AFTER the core middleware
 app.use('/api/v1', mainRouter);
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
+
 
 // --- Health Check ---
 app.get('/', (req, res) => {

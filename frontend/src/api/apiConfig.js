@@ -1,22 +1,32 @@
-import axios from 'axios';
+import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api/v1/',
-  withCredentials: true, // This is crucial! It allows cookies to be sent
+  baseURL: "http://localhost:5000/api/v1/",
+  withCredentials: true, 
 });
 
-// Add a request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    // Get the token from localStorage
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
-      // If the token exists, add it to the Authorization header
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers["Authorization"] = `Bearer ${token}`;
+      console.log(" Attaching token to request:", token);
+    } else {
+      console.log("No token available yet (user not logged in)");
     }
     return config;
   },
+  (error) => Promise.reject(error)
+);
+
+apiClient.interceptors.response.use(
+  (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      console.warn("Token expired or unauthorized — clearing localStorage");
+      localStorage.removeItem("token");
+     
+    }
     return Promise.reject(error);
   }
 );

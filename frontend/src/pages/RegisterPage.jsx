@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState(''); // 1. Add phone state
+  const [phone, setPhone] = useState(''); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);

@@ -1,5 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import { logoutUser } from '../api/authApi'; // 1. Import logoutUser
+import { logoutUser } from '../api/authApi'; 
 
 const AuthContext = createContext(null);
 
@@ -23,11 +23,10 @@ export const AuthProvider = ({ children }) => {
   // 2. Update the logout function
   const logout = async () => {
     try {
-      await logoutUser(); // Call the backend logout
+      await logoutUser(); 
     } catch (error) {
-      console.error("Logout failed:", error.message);
+     
     } finally {
-      // 3. Clear frontend state
       setUser(null);
       setToken(null);
     }
