@@ -81,7 +81,7 @@ class ProductService {
   static async getAllProducts(queryParams = {}) {
     const {
       category,
-      status = 'PUBLISHED', // ✅ Default to published products
+      status, // No default here, logic below handles it
       sortBy = 'createdAt',
       order = 'desc',
       page = 1,
@@ -89,10 +89,21 @@ class ProductService {
       featured
     } = queryParams;
 
-    const where = { status };
+    const where = {};
+
+    // Default to PUBLISHED if undefined. If 'ALL', show all. Otherwise filter by specific status.
+    if (status && status !== 'ALL') {
+      where.status = status;
+    } else if (!status) {
+      where.status = 'PUBLISHED';
+    }
 
     if (category) {
       where.category = { name: category };
+    }
+
+    if (queryParams.supplier) {
+      where.supplier = { name: queryParams.supplier };
     }
 
     if (featured !== undefined) {

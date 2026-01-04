@@ -6,7 +6,7 @@ const ActivityLogService = require('./activityLog.service');
 const transporter = require('../config/mailer');
 
 class OrderService {
- 
+
   static async placeOrder(userId, orderData, ipAddress) {
     const { cartId, items, fullAddress, paymentMethod, promotionCode, guestDetails } = orderData;
 
@@ -150,10 +150,10 @@ class OrderService {
     });
   }
 
-  
+
   static async trackOrderPublic(orderId) {
     console.log('🔍 Tracking order with ID:', orderId);
-    
+
     const idAsInt = parseInt(orderId);
     if (isNaN(idAsInt)) {
       throw new ApiError(400, 'Invalid Order ID format.');
@@ -237,7 +237,7 @@ class OrderService {
     return await prisma.order.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: { 
+      include: {
         orderItems: true,
         address: true,
         payment: true
@@ -245,10 +245,13 @@ class OrderService {
     });
   }
 
-  
+
   static async getAllOrders(filters = {}) {
-    const { status, startDate, endDate, customer } = filters;
+    const { status, startDate, endDate, customer, search } = filters;
     const whereClause = {};
+
+    // Use 'search' or 'customer' for the generic search term
+    const searchTerm = search || customer;
 
     if (status) whereClause.status = status;
     if (startDate || endDate) {
@@ -256,12 +259,22 @@ class OrderService {
       if (startDate) whereClause.createdAt.gte = new Date(startDate);
       if (endDate) whereClause.createdAt.lte = new Date(endDate);
     }
-    if (customer) {
-      whereClause.OR = [
-        { customerName: { contains: customer } },
-        { customerPhone: { contains: customer } },
-        { user: { email: { contains: customer } } },
+
+    if (searchTerm) {
+      const searchConditions = [
+        { customerName: { contains: searchTerm } },
+        { customerPhone: { contains: searchTerm } },
+        { customerEmail: { contains: searchTerm } },
+        { user: { email: { contains: searchTerm } } },
       ];
+
+      // If search term is a number, also assume it might be an Order ID
+      const searchInt = parseInt(searchTerm);
+      if (!isNaN(searchInt)) {
+        searchConditions.push({ id: searchInt });
+      }
+
+      whereClause.OR = searchConditions;
     }
 
     return await prisma.order.findMany({
@@ -276,7 +289,7 @@ class OrderService {
     });
   }
 
-  
+
   static async updateOrderStatus(orderId, newStatus, adminId, comment) {
     const validStatuses = ['PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
     if (!validStatuses.includes(newStatus)) {
@@ -284,7 +297,7 @@ class OrderService {
     }
 
     const idAsInt = parseInt(orderId);
-    if(isNaN(idAsInt)) throw new ApiError(400, 'Invalid Order ID format.');
+    if (isNaN(idAsInt)) throw new ApiError(400, 'Invalid Order ID format.');
 
     // Use a transaction to update status AND add history
     const [updatedOrder] = await prisma.$transaction([
@@ -311,7 +324,48 @@ class OrderService {
     return updatedOrder;
   }
 
+  static async getOrderStatistics(period = 'month') {
+    const now = new Date();
+    let startDate = new Date();
 
+    if (period === 'day') startDate.setDate(now.getDate() - 1);
+    else if (period === 'week') startDate.setDate(now.getDate() - 7);
+    else if (period === 'month') startDate.setMonth(now.getMonth() - 1);
+    else if (period === 'year') startDate.setFullYear(now.getFullYear() - 1);
+
+    const where = {
+      createdAt: { gte: startDate }
+    };
+
+    // Parallelize queries for efficiency
+    const [
+      totalOrders,
+      revenueResult,
+      pendingOrders,
+      totalProducts,
+      totalCustomers,
+      lowStockProducts
+    ] = await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.aggregate({
+        _sum: { totalAmount: true },
+        where: { ...where, status: { not: 'CANCELLED' } }
+      }),
+      prisma.order.count({ where: { status: 'PENDING' } }), // Global pending
+      prisma.product.count(), // Global products
+      prisma.user.count(),    // Global users
+      prisma.productInventory.count({ where: { quantity: { lte: 5 } } }) // Low stock (e.g. <= 5)
+    ]);
+
+    return {
+      totalOrders,
+      totalRevenue: revenueResult._sum.totalAmount || 0,
+      pendingOrders,
+      totalProducts,
+      totalCustomers,
+      lowStockProducts
+    };
+  }
 }
 
 module.exports = OrderService;

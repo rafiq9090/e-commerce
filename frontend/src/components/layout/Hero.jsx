@@ -1,125 +1,128 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, ShoppingBag, Zap } from 'lucide-react';
+import { ArrowRight, Sparkles, ShoppingBag, Zap, ShieldCheck, Truck, Percent } from 'lucide-react';
 
 const Hero = () => {
   return (
-    <div className="relative bg-gradient-to-br p-6 from-blue-600 via-blue-700 to-indigo-900 text-white overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse delay-500"></div>
+    <div className="relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50 via-blue-50 to-white text-slate-900 overflow-hidden min-h-[90vh] flex items-center">
+
+      {/* Animated Background Elements - Made Subtle */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[20%] -right-[10%] w-[50vw] h-[50vw] bg-purple-200/40 rounded-full blur-[100px] animate-pulse"></div>
+        <div className="absolute -bottom-[20%] -left-[10%] w-[50vw] h-[50vw] bg-blue-200/40 rounded-full blur-[100px] animate-pulse delay-700"></div>
+        {/* Grid Pattern Overlay */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 brightness-100 contrast-150 mix-blend-overlay"></div>
       </div>
 
-      <div className="container mx-auto px-6 py-20 md:py-32 relative z-10">
-        <div className="flex flex-col md:flex-row items-center gap-12">
-          
+      <div className="container mx-auto px-6 py-20 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+
           {/* --- Text Content --- */}
-          <div className="md:w-1/2 space-y-8 text-center md:text-left">
+          <div className="space-y-8 text-center lg:text-left">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 text-sm font-medium">
-              <Sparkles className="w-4 h-4 text-yellow-300" />
-              <span>Trusted by 10,000+ Happy Customers</span>
+            <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-md border border-white/40 rounded-full px-5 py-2 text-sm font-semibold shadow-sm animate-fade-in-up text-indigo-900">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+              </span>
+              <span className="tracking-wide">#1 Trusted E-commerce Platform</span>
             </div>
 
             {/* Main Heading */}
-            <h1 className="text-5xl md:text-7xl font-black leading-tight">
-              Welcome to
-              <span className="block bg-gradient-to-r from-yellow-300 via-orange-300 to-pink-300 bg-clip-text text-transparent mt-2">
-                DeshShera
+            <h1 className="text-5xl lg:text-7xl font-black leading-[1.1] tracking-tight text-slate-900">
+              Elevate Your <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">
+                Shopping Standard
               </span>
             </h1>
 
             {/* Subheading */}
-            <p className="text-xl md:text-2xl text-blue-50 leading-relaxed max-w-xl">
-              Discover premium products at unbeatable prices. Your satisfaction is our guarantee.
+            <p className="text-lg lg:text-xl text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium border-l-4 border-yellow-400 pl-6">
+              Experience the perfect blend of quality and affordability. Shop huge discounts on premium products today.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <Link 
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
+              <Link
                 to="/products"
-                className="group relative bg-white text-blue-700 font-bold py-4 px-8 rounded-full text-lg hover:bg-gray-50 transition-all duration-300 shadow-2xl hover:shadow-white/20 hover:scale-105 inline-flex items-center justify-center gap-2"
+                className="group relative bg-blue-600 text-white font-bold py-4 px-10 rounded-2xl text-lg hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 transform hover:-translate-y-1 inline-flex items-center justify-center gap-2 overflow-hidden"
               >
-                <ShoppingBag className="w-5 h-5" />
-                Shop All Products
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                <ShoppingBag className="w-5 h-5 relative z-10" />
+                <span className="relative z-10">Shop Now</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform relative z-10" />
               </Link>
 
-              <Link 
+              <Link
                 to="/deals"
-                className="group bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white font-bold py-4 px-8 rounded-full text-lg hover:bg-white/20 transition-all duration-300 inline-flex items-center justify-center gap-2"
+                className="group bg-white/50 backdrop-blur-sm border border-slate-200 text-slate-700 font-bold py-4 px-10 rounded-2xl text-lg hover:bg-white/80 transition-all duration-300 inline-flex items-center justify-center gap-2 hover:shadow-md"
               >
-                <Zap className="w-5 h-5 text-yellow-300" />
-                Today's Deals
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <Zap className="w-5 h-5 text-yellow-500 group-hover:scale-110 transition-transform" />
+                <span>Daily Deals</span>
               </Link>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap gap-6 justify-center md:justify-start pt-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-sm text-blue-100">Free Shipping</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-sm text-blue-100">Easy Returns</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-sm text-blue-100">Secure Payment</span>
-              </div>
+            {/* Trust Indicators Grid */}
+            <div className="grid grid-cols-3 gap-4 pt-8 border-t border-slate-200 mt-8">
+              {[
+                { icon: <Truck className="text-blue-500" />, text: "Fast Delivery", sub: "2-3 Days" },
+                { icon: <ShieldCheck className="text-indigo-500" />, text: "Secure Pay", sub: "100% Safe" },
+                { icon: <Percent className="text-rose-500" />, text: "Best Prices", sub: "Guaranteed" },
+              ].map((item, i) => (
+                <div key={i} className="flex flex-col items-center lg:items-start text-center lg:text-left">
+                  <div className="bg-white p-3 rounded-xl mb-2 shadow-sm border border-slate-100 text-slate-900 group-hover:scale-105 transition-transform">
+                    {item.icon}
+                  </div>
+                  <span className="font-bold text-sm block text-slate-800">{item.text}</span>
+                  <span className="text-xs text-slate-500">{item.sub}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* --- Image Section --- */}
-          <div className="md:w-1/2 flex justify-center">
-            <div className="relative group">
-              {/* Glow Effect */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-              
-              {/* Main Image */}
-              <div className="relative">
-                <img 
-                  src="https://deshshera.com/wp-content/uploads/al_opt_content/IMAGE/deshshera.com/wp-content/uploads/2025/10/DeshSera_hero.webp.bv_resized_desktop.webp.bv.webp?bv_host=deshshera.com" 
-                  alt="Featured products" 
-                  className="rounded-3xl shadow-2xl w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500 border-4 border-white/20"
-                />
-                
-                {/* Floating Badge */}
-                <div className="absolute -bottom-6 -left-6 bg-white text-blue-700 rounded-2xl shadow-2xl p-4 transform group-hover:scale-110 transition-transform">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 p-3 rounded-xl">
-                      <ShoppingBag className="w-6 h-6 text-blue-700" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-black">1000+</p>
-                      <p className="text-sm text-gray-600">Products</p>
-                    </div>
-                  </div>
-                </div>
+          <div className="relative group perspective-1000">
+            {/* Decorative Background Blob */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-500 transform rotate-6 scale-95"></div>
 
-                {/* Floating Badge 2 */}
-                <div className="absolute -top-6 -right-6 bg-gradient-to-r from-orange-400 to-pink-500 text-white rounded-2xl shadow-2xl p-4 transform group-hover:scale-110 transition-transform">
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">UP TO</p>
-                    <p className="text-3xl font-black">50%</p>
-                    <p className="text-xs">OFF</p>
+            {/* Main Card Container */}
+            <div className="relative bg-white/5 backdrop-blur-xl border border-white/20 p-4 rounded-[2.5rem] shadow-2xl transform transition-all duration-500 hover:rotate-1 hover:scale-[1.02]">
+              <div className="relative rounded-[2rem] overflow-hidden aspect-[4/3] group">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10 opacity-60"></div>
+                <img
+                  src="https://deshshera.com/wp-content/uploads/al_opt_content/IMAGE/deshshera.com/wp-content/uploads/2025/10/DeshSera_hero.webp.bv_resized_desktop.webp.bv.webp?bv_host=deshshera.com"
+                  alt="Hero Showcase"
+                  className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000"
+                />
+
+                {/* Overlay Content */}
+                <div className="absolute bottom-6 left-6 z-20 text-left">
+                  <p className="text-yellow-400 font-bold tracking-wider text-sm mb-1">FEATURED COLLECTION</p>
+                  <h3 className="text-3xl font-black text-white leading-tight">Winter <br /> Essentials</h3>
+                </div>
+              </div>
+
+              {/* Floating Elements */}
+              <div className="absolute -top-6 -right-6 bg-white text-blue-900 p-4 rounded-2xl shadow-xl shadow-black/20 animate-bounce-slow">
+                <div className="flex items-center gap-3 font-bold">
+                  <div className="bg-yellow-400 rounded-full p-2 text-yellow-900">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase">New Arrivals</p>
+                    <p className="text-lg">Just In!</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="absolute -bottom-8 -right-8 bg-blue-600 text-white p-5 rounded-2xl shadow-xl shadow-blue-900/40 transform -rotate-3 hover:rotate-0 transition-transform duration-300">
+                <p className="text-xs font-bold opacity-80 uppercase mb-1">Limited Offer</p>
+                <p className="text-3xl font-black leading-none">50%</p>
+                <p className="text-sm font-bold opacity-80 text-right">OFF</p>
               </div>
             </div>
           </div>
 
         </div>
-      </div>
-
-      {/* Wave Bottom */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg className="w-full h-16 md:h-24 fill-current text-white" viewBox="0 0 1440 120" preserveAspectRatio="none">
-          <path d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,120L1360,120C1280,120,1120,120,960,120C800,120,640,120,480,120C320,120,160,120,80,120L0,120Z"></path>
-        </svg>
       </div>
     </div>
   );
