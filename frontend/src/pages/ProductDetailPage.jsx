@@ -3,12 +3,12 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { getProductBySlug, getRelatedProducts } from "../api/productApi";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
-import { 
-  ShoppingCart, 
-  Truck, 
-  Shield, 
-  Star, 
-  ArrowLeft, 
+import {
+  ShoppingCart,
+  Truck,
+  Shield,
+  Star,
+  ArrowLeft,
   Heart,
   Share2,
   Package,
@@ -86,7 +86,7 @@ const ProductDetailPage = () => {
           product: product,
           quantity: quantity
         };
-        
+
         navigate('/checkout', {
           state: {
             guestProducts: [guestProduct]
@@ -141,13 +141,13 @@ const ProductDetailPage = () => {
   };
 
   const nextSlide = () => {
-    setCurrentSlide((prev) => 
+    setCurrentSlide((prev) =>
       prev === Math.ceil(relatedProducts.length / 4) - 1 ? 0 : prev + 1
     );
   };
 
   const prevSlide = () => {
-    setCurrentSlide((prev) => 
+    setCurrentSlide((prev) =>
       prev === 0 ? Math.ceil(relatedProducts.length / 4) - 1 : prev - 1
     );
   };
@@ -197,7 +197,7 @@ const ProductDetailPage = () => {
   const inStock = product.inventory?.quantity > 0;
   const maxQuantity = inStock ? Math.min(product.inventory.quantity, 10) : 0;
   const hasDiscount = product.sale_price && product.sale_price < product.regular_price;
-  const discountPercentage = hasDiscount 
+  const discountPercentage = hasDiscount
     ? Math.round(((product.regular_price - product.sale_price) / product.regular_price) * 100)
     : 0;
 
@@ -208,7 +208,7 @@ const ProductDetailPage = () => {
   // Calculate visible products for carousel
   const itemsPerSlide = 4;
   const visibleProducts = relatedProducts.slice(
-    currentSlide * itemsPerSlide, 
+    currentSlide * itemsPerSlide,
     (currentSlide + 1) * itemsPerSlide
   );
 
@@ -220,7 +220,7 @@ const ProductDetailPage = () => {
       <div className="container mx-auto p-4 md:p-8">
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 text-sm mb-8 bg-white rounded-full px-6 py-3 shadow-sm inline-flex">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors font-medium"
           >
@@ -245,17 +245,17 @@ const ProductDetailPage = () => {
                   src={selectedImage || "https://placehold.co/600x400?text=No+Image"}
                   alt={product.name}
                   className="w-full h-96 lg:h-[550px] object-cover transition-transform duration-500 group-hover:scale-110"
+                  onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/600x400?text=No+Image" }}
                 />
-                
+
                 {/* Floating Action Buttons */}
                 <div className="absolute top-6 right-6 flex flex-col gap-3">
                   <button
                     onClick={toggleWishlist}
-                    className={`p-4 rounded-2xl backdrop-blur-md transition-all shadow-lg hover:scale-110 ${
-                      isWishlisted 
-                        ? "bg-red-500 text-white" 
+                    className={`p-4 rounded-2xl backdrop-blur-md transition-all shadow-lg hover:scale-110 ${isWishlisted
+                        ? "bg-red-500 text-white"
                         : "bg-white/90 text-gray-700 hover:bg-red-500 hover:text-white"
-                    }`}
+                      }`}
                   >
                     <Heart size={22} className={isWishlisted ? "fill-current" : ""} />
                   </button>
@@ -297,11 +297,10 @@ const ProductDetailPage = () => {
                     <button
                       key={image.id}
                       onClick={() => setSelectedImage(image.url)}
-                      className={`flex-shrink-0 border-3 rounded-2xl overflow-hidden transition-all transform hover:scale-105 ${
-                        selectedImage === image.url
+                      className={`flex-shrink-0 border-3 rounded-2xl overflow-hidden transition-all transform hover:scale-105 ${selectedImage === image.url
                           ? "border-blue-600 shadow-lg ring-2 ring-blue-200"
                           : "border-gray-200 hover:border-blue-400"
-                      }`}
+                        }`}
                     >
                       <img
                         src={image.url}
@@ -448,24 +447,22 @@ const ProductDetailPage = () => {
               <button
                 onClick={handleAddToCart}
                 disabled={!inStock}
-                className={`flex-1 flex items-center justify-center gap-3 py-5 px-8 rounded-2xl text-lg font-bold transition-all shadow-lg ${
-                  inStock
+                className={`flex-1 flex items-center justify-center gap-3 py-5 px-8 rounded-2xl text-lg font-bold transition-all shadow-lg ${inStock
                     ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl transform hover:scale-105"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 <ShoppingCart size={22} />
                 {inStock ? "Add to Cart" : "Out of Stock"}
               </button>
-              
+
               <button
                 onClick={handleOrderNow}
                 disabled={!inStock}
-                className={`flex-1 flex items-center justify-center gap-3 py-5 px-8 rounded-2xl text-lg font-bold border-3 transition-all shadow-lg ${
-                  inStock
+                className={`flex-1 flex items-center justify-center gap-3 py-5 px-8 rounded-2xl text-lg font-bold border-3 transition-all shadow-lg ${inStock
                     ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 hover:shadow-xl transform hover:scale-105"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300"
-                }`}
+                  }`}
               >
                 <Zap size={22} />
                 Order Now
@@ -539,8 +536,8 @@ const ProductDetailPage = () => {
                 You May Also Like
               </h2>
               <div className="flex items-center gap-4">
-                <Link 
-                  to="/products" 
+                <Link
+                  to="/products"
                   className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-2 group"
                 >
                   View All
@@ -581,7 +578,7 @@ const ProductDetailPage = () => {
                   {visibleProducts.map((relatedProduct) => {
                     const relatedInStock = relatedProduct.inventory?.quantity > 0;
                     const relatedHasDiscount = relatedProduct.sale_price && relatedProduct.sale_price < relatedProduct.regular_price;
-                    const relatedDiscount = relatedHasDiscount 
+                    const relatedDiscount = relatedHasDiscount
                       ? Math.round(((relatedProduct.regular_price - relatedProduct.sale_price) / relatedProduct.regular_price) * 100)
                       : 0;
 
@@ -624,7 +621,7 @@ const ProductDetailPage = () => {
                               {relatedProduct.name}
                             </h3>
                           </Link>
-                          
+
                           <div className="flex items-center gap-2 mb-3">
                             <div className="flex">
                               {[1, 2, 3, 4, 5].map((star) => (
@@ -661,11 +658,10 @@ const ProductDetailPage = () => {
                               handleAddRelatedToCart(relatedProduct);
                             }}
                             disabled={!relatedInStock}
-                            className={`w-full py-3 rounded-xl font-semibold transition-all transform flex items-center justify-center gap-2 ${
-                              relatedInStock
+                            className={`w-full py-3 rounded-xl font-semibold transition-all transform flex items-center justify-center gap-2 ${relatedInStock
                                 ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg group-hover:scale-105"
                                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            }`}
+                              }`}
                           >
                             <ShoppingCart size={18} />
                             {relatedInStock ? "Add to Cart" : "Out of Stock"}
@@ -683,11 +679,10 @@ const ProductDetailPage = () => {
                       <button
                         key={index}
                         onClick={() => setCurrentSlide(index)}
-                        className={`h-2 rounded-full transition-all ${
-                          currentSlide === index 
-                            ? "w-8 bg-gradient-to-r from-blue-600 to-indigo-600" 
+                        className={`h-2 rounded-full transition-all ${currentSlide === index
+                            ? "w-8 bg-gradient-to-r from-blue-600 to-indigo-600"
                             : "w-2 bg-gray-300 hover:bg-gray-400"
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>

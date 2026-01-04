@@ -20,7 +20,8 @@ import {
   Settings,
   Users,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +32,7 @@ import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '..
 import { getAllMenus, createMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '../api/menuApi';
 import { getAllContent, updateContent } from '../api/contentApi';
 import { getAllBlocked, addToBlocklist, removeFromBlocklist } from '../api/blocklistApi';
+import { registerAdmin, getRoles, getAdmins } from '../api/adminApi';
 
 const AdminDashboard = () => {
   const { logout, user } = useAuth();
@@ -96,6 +98,7 @@ const AdminDashboard = () => {
       case 'content': return <SiteContentManager />;
       case 'blocklist': return <BlocklistManager />;
       case 'settings': return <SettingsManager />;
+      case 'admins': return <AdminsManager />;
       default: return <DashboardOverview />;
     }
   };
@@ -135,6 +138,9 @@ const AdminDashboard = () => {
           <SidebarItem icon={<MenuIcon size={20} />} label="Menus" active={activeTab === 'menus'} onClick={() => handleTabChange('menus')} isOpen={isSidebarOpen} />
           <SidebarItem icon={<Type size={20} />} label="Site Content" active={activeTab === 'content'} onClick={() => handleTabChange('content')} isOpen={isSidebarOpen} />
           <SidebarItem icon={<ShieldAlert size={20} />} label="Blocklist" active={activeTab === 'blocklist'} onClick={() => handleTabChange('blocklist')} isOpen={isSidebarOpen} />
+          {user?.role === 'SUPER_ADMIN' && (
+            <SidebarItem icon={<Users size={20} />} label="Admins" active={activeTab === 'admins'} onClick={() => handleTabChange('admins')} isOpen={isSidebarOpen} />
+          )}
           <SidebarItem icon={<Settings size={20} />} label="Settings" active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} isOpen={isSidebarOpen} />
         </nav>
         <div className="p-4 border-t border-gray-800">
@@ -189,42 +195,92 @@ const SidebarItem = ({ icon, label, active, onClick, isOpen, badge, badgeColor =
 const DashboardOverview = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('month');
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const data = await getOrderStatistics('month');
+      const data = await getOrderStatistics(period);
       setStats(data.data || data);
     } catch (error) { console.error("Failed to load stats", error); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchStats(); }, []);
+  useEffect(() => { fetchStats(); }, [period]);
+
   const displayStats = stats || { totalOrders: 0, totalRevenue: 0, pendingOrders: 0 };
+
+  const periodLabels = {
+    'day': 'Today',
+    'week': 'This Week',
+    'month': 'This Month',
+    'year': 'This Year'
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800">Dashboard Overview</h2>
-        <button onClick={fetchStats} className="text-blue-600 font-medium text-sm flex items-center gap-2 hover:bg-blue-50 px-3 py-2 rounded-lg transition">
-          <RefreshCw size={16} /> Refresh Data
-        </button>
+
+        <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+          {['day', 'week', 'month', 'year'].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${period === p
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+              {periodLabels[p]}
+            </button>
+          ))}
+        </div>
       </div>
+
       {loading ? (
-        <div className="flex justify-center items-center h-64 text-gray-500">Loading statistics...</div>
+        <div className="flex justify-center items-center h-64 text-gray-500">
+          <div className="flex flex-col items-center gap-2">
+            <RefreshCw className="animate-spin text-blue-500" size={24} />
+            <span>Loading statistics...</span>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard title="Total Orders" value={displayStats.totalOrders || 0} icon={<ShoppingCart className="text-blue-500" size={24} />} trend="This Month" color="bg-blue-50" />
-          <StatCard title="Total Revenue" value={`৳${Number(displayStats.totalRevenue || 0).toLocaleString()}`} icon={<span className="text-2xl font-bold text-green-500">৳</span>} trend="This Month" color="bg-green-50" />
-          <StatCard title="Pending Orders" value={displayStats.pendingOrders || 0} icon={<Package className="text-orange-500" size={24} />} trend="Needs Attention" color="bg-orange-50" />
+          <StatCard
+            title="Total Orders"
+            value={displayStats.totalOrders || 0}
+            icon={<ShoppingCart className="text-blue-500" size={24} />}
+            trend={periodLabels[period]}
+            color="bg-blue-50"
+          />
+          <StatCard
+            title="Total Revenue"
+            value={`৳${Number(displayStats.totalRevenue || 0).toLocaleString()}`}
+            icon={<span className="text-2xl font-bold text-green-500">৳</span>}
+            trend={periodLabels[period]}
+            color="bg-green-50"
+          />
+          <StatCard
+            title="Pending Orders"
+            value={displayStats.pendingOrders || 0}
+            icon={<Package className="text-orange-500" size={24} />}
+            trend="Needs Attention"
+            color="bg-orange-50"
+          />
 
           <StatCard title="Total Products" value={displayStats.totalProducts || 0} icon={<Package className="text-purple-500" size={24} />} trend="All Time" color="bg-purple-50" />
           <StatCard title="Total Customers" value={displayStats.totalCustomers || 0} icon={<Users className="text-teal-500" size={24} />} trend="All Time" color="bg-teal-50" />
           <StatCard title="Low Stock Items" value={displayStats.lowStockProducts || 0} icon={<AlertTriangle className="text-red-500" size={24} />} trend="Restock Now" color="bg-red-50" />
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">System Status</h3>
-        <p className="text-gray-500">System is running smooth.</p>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-1">System Status</h3>
+          <p className="text-gray-500 text-sm">All services are running normally.</p>
+        </div>
+        <button onClick={fetchStats} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors" title="Reload Data">
+          <RefreshCw size={20} />
+        </button>
       </div>
     </div >
   );
@@ -322,63 +378,157 @@ const MenusManager = () => {
   );
 };
 
+import { uploadFile } from '../api/uploadApi';
+
 const SiteContentManager = () => {
   const [content, setContent] = useState([]);
   const [editMap, setEditMap] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState(null);
 
   const fetchContent = async () => {
+    setLoading(true);
     try {
       const res = await getAllContent();
       const data = res.data || res;
-      setContent(data);
       // Initialize edit map
       const initialMap = {};
       data.forEach(c => initialMap[c.key] = c.value);
       setEditMap(initialMap);
     } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
   useEffect(() => { fetchContent(); }, []);
 
   const handleSave = async (key, type) => {
     try {
-      await updateContent({ key, value: editMap[key], type });
-      alert("Saved!");
+      await updateContent({ key, value: editMap[key] || '', type });
+      alert("Saved " + key);
+      fetchContent();
     } catch (e) { alert("Failed to save"); }
   };
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Site Content</h2>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
-        <p className="text-gray-500 mb-4">Manage header texts, footer descriptions, social links, etc.</p>
+  const handleFileUpload = async (e, key) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-        {/* Helper to show consistent UI for different keys */}
-        {['header_title', 'footer_description', 'contact_email', 'contact_phone'].map(key => (
-          <div key={key} className="flex flex-col space-y-1">
-            <label className="text-sm font-semibold text-gray-700 capitalize">{key.replace('_', ' ')}</label>
-            <div className="flex gap-2">
-              <input
-                value={editMap[key] || ''}
-                onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
-                className="flex-1 border p-2 rounded"
-              />
-              <button onClick={() => handleSave(key, 'TEXT')} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700"><Save size={16} /></button>
-            </div>
-          </div>
-        ))}
+    setUploadingKey(key);
+    try {
+      const res = await uploadFile(file);
+      const url = res.data.url;
+      setEditMap(prev => ({ ...prev, [key]: url }));
+    } catch (err) {
+      alert("Upload failed: " + (err.message || "Unknown error"));
+    } finally {
+      setUploadingKey(null);
+    }
+  };
 
-        {/* Example for Image/Logo */}
-        <div className="flex flex-col space-y-1 pt-4 border-t">
-          <label className="text-sm font-semibold text-gray-700">Logo URL</label>
-          <div className="flex gap-2">
+  const renderField = (label, key, type = 'TEXT', placeholder = '') => (
+    <div className="flex flex-col space-y-2">
+      <label className="text-sm font-semibold text-gray-700">{label}</label>
+      <div className="flex gap-2 items-center">
+        {type === 'TEXT' ? (
+          key.includes('description') || key.includes('text') && key.length > 20 ?
+            <textarea
+              value={editMap[key] || ''}
+              onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
+              className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none min-h-[80px]"
+              placeholder={placeholder}
+            /> :
             <input
-              value={editMap['site_logo'] || ''}
-              onChange={(e) => setEditMap({ ...editMap, ['site_logo']: e.target.value })}
-              className="flex-1 border p-2 rounded"
-              placeholder="https://..."
+              value={editMap[key] || ''}
+              onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
+              className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder={placeholder}
             />
-            <button onClick={() => handleSave('site_logo', 'IMAGE_URL')} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700"><Save size={16} /></button>
+        ) : (
+          <div className="flex-1 flex gap-2">
+            <input
+              value={editMap[key] || ''}
+              onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
+              className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none font-mono text-sm text-blue-600"
+              placeholder="https://example.com/image.png"
+            />
+            <label className={`cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded border flex items-center gap-2 text-xs font-bold ${uploadingKey === key ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              {uploadingKey === key ? '...' : <Upload size={14} />}
+              <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, key)} disabled={uploadingKey === key} />
+              Upload
+            </label>
           </div>
+        )}
+        <button
+          onClick={() => handleSave(key, type)}
+          className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center h-10"
+          title="Save"
+        >
+          <Save size={18} />
+        </button>
+      </div>
+      {type === 'IMAGE_URL' && editMap[key] && (
+        <div className="mt-2 p-2 border rounded bg-gray-50 inline-block relative group">
+          <img src={editMap[key]} alt="Preview" className="h-20 object-contain" onError={(e) => e.target.style.display = 'none'} />
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-8 pb-10">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Site Content Management</h2>
+        <button onClick={fetchContent} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium">Refresh</button>
+      </div>
+
+      {/* Branding Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-blue-500">🎨</span> Branding & Logos
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderField('Site Logo URL', 'site_logo', 'IMAGE_URL')}
+          {renderField('Site Favicon URL', 'site_favicon', 'IMAGE_URL')}
+        </div>
+      </div>
+
+      {/* Top Navbar Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-purple-500">📏</span> Top Navbar
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderField('Announcement Text', 'top_bar_announcement', 'TEXT', 'e.g., Free Shipping on orders over $50!')}
+          {renderField('Contact Phone (Header)', 'contact_phone', 'TEXT')}
+        </div>
+      </div>
+
+      {/* Hero Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-orange-500">🦸</span> Hero Section
+        </h3>
+        <div className="space-y-4">
+          {renderField('Hero Headline', 'hero_headline', 'TEXT', 'Elevate Your Shopping Standard')}
+          {renderField('Hero Sub-headline', 'hero_subheadline', 'TEXT', 'Experience the perfect blend of quality...')}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {renderField('Hero Background/Image URL', 'hero_image', 'IMAGE_URL')}
+            {renderField('Hero CTA Text', 'hero_cta_text', 'TEXT', 'Shop Now')}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-gray-500">🦶</span> Footer
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderField('Footer Description', 'footer_description', 'TEXT')}
+          {renderField('Copyright Text', 'footer_copyright', 'TEXT')}
+          {renderField('Contact Email', 'contact_email', 'TEXT')}
+          {renderField('Social Facebook URL', 'social_facebook', 'TEXT')}
+          {renderField('Social Twitter URL', 'social_twitter', 'TEXT')}
+          {renderField('Social Instagram URL', 'social_instagram', 'TEXT')}
         </div>
       </div>
     </div>
@@ -535,9 +685,11 @@ const ProductsManager = () => {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const [productCounts, setProductCounts] = useState({ ALL: 0, PUBLISHED: 0, DRAFT: 0, ARCHIVED: 0 });
+  const [uploading, setUploading] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '', slug: '', description: '', short_description: '', regular_price: '', sale_price: '',
-    categoryId: '', supplierId: '', inventory: 0, imageUrl: '', status: 'DRAFT',
+    categoryId: '', supplierId: '', inventory: 0, images: [], status: 'DRAFT',
     seoTitle: '', seoDescription: '', seoKeywords: ''
   });
 
@@ -587,9 +739,43 @@ const ProductsManager = () => {
 
   const handleInputChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
 
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const newImages = [...formData.images];
+      // Upload each file sequentially (or parallel) and add to list
+      for (const file of files) {
+        const res = await uploadFile(file);
+        newImages.push(res.data.url);
+      }
+      setFormData(prev => ({ ...prev, images: newImages }));
+    } catch (err) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Map simple string URLs to object structure expected by backend if needed, 
+      // OR backend might handle string array. 
+      // Based on previous code: `images: formData.imageUrl ? [{ url: formData.imageUrl }] : []`
+      // It seems it expects `{ url: "..." }`.
+
+      const formattedImages = formData.images.map(url => ({ url }));
+
       const payload = {
         ...formData,
         categoryId: parseInt(formData.categoryId),
@@ -597,7 +783,7 @@ const ProductsManager = () => {
         regular_price: parseFloat(formData.regular_price),
         sale_price: formData.sale_price ? parseFloat(formData.sale_price) : null,
         inventory: parseInt(formData.inventory),
-        images: formData.imageUrl ? [{ url: formData.imageUrl }] : []
+        images: formattedImages
       };
       if (editingProduct) { await updateProduct(editingProduct.id, payload); alert('Updated!'); } else { await createProduct(payload); alert('Created!'); }
       setIsModalOpen(false); fetchData(); resetForm();
@@ -625,11 +811,16 @@ const ProductsManager = () => {
 
   const openEditModal = (p) => {
     setEditingProduct(p);
+    // Flatten image objects to simple URL array for state
+    const currentImages = p.images ? p.images.map(img => img.url) : [];
+
     setFormData({
       name: p.name, slug: p.slug, description: p.description, short_description: p.short_description || '',
       regular_price: p.regular_price, sale_price: p.sale_price || '',
       categoryId: p.categoryId || '', supplierId: p.supplierId || '',
-      inventory: p.inventory?.quantity || 0, imageUrl: p.images?.[0]?.url || '', status: p.status || 'DRAFT',
+      inventory: p.inventory?.quantity || 0,
+      images: currentImages,
+      status: p.status || 'DRAFT',
       seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || ''
     });
     setIsModalOpen(true);
@@ -640,7 +831,7 @@ const ProductsManager = () => {
     setFormData({
       name: '', slug: '', description: '', short_description: '', regular_price: '', sale_price: '',
       categoryId: categories[0]?.id || '', supplierId: suppliers[0]?.id || '', inventory: 0,
-      imageUrl: '', status: 'DRAFT',
+      images: [], status: 'DRAFT',
       seoTitle: '', seoDescription: '', seoKeywords: ''
     });
   };
@@ -701,7 +892,16 @@ const ProductsManager = () => {
             {products.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-gray-500">No products found for this filter.</td></tr>}
             {products.map(p => (
               <tr key={p.id}>
-                <td className="p-4">{p.name}</td>
+                <td className="p-4">
+                  <div className="flex items-center gap-3">
+                    {p.images && p.images[0] ? (
+                      <img src={p.images[0].url} alt="" className="w-10 h-10 rounded object-cover border" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-gray-100 border flex items-center justify-center text-gray-400"><Package size={16} /></div>
+                    )}
+                    <span className="font-medium">{p.name}</span>
+                  </div>
+                </td>
                 <td className="p-4">${p.regular_price}</td>
                 <td className="p-4">
                   <span className={`px-2 py-1 text-xs rounded-full font-bold ${p.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : p.status === 'ARCHIVED' ? 'bg-orange-100 text-orange-700' : 'bg-gray-200 text-gray-700'}`}>
@@ -769,7 +969,26 @@ const ProductsManager = () => {
                   <option value="DRAFT">Draft</option>
                   <option value="PUBLISHED">Published</option>
                 </select>
-                <input name="imageUrl" value={formData.imageUrl} onChange={handleInputChange} placeholder="Image URL" className="w-full border p-2 rounded" />
+
+                {/* Enhanced Image Uploader */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Product Images</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {formData.images.map((url, idx) => (
+                      <div key={idx} className="relative group w-16 h-16 border rounded overflow-hidden">
+                        <img src={url} alt="Prod" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded-bl">
+                          <XCircle size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    <label className={`w-16 h-16 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors ${uploading ? 'opacity-50' : ''}`}>
+                      {uploading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div> : <Plus className="text-gray-400" />}
+                      <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-400">Add multiple images. First one is cover.</p>
+                </div>
               </div>
 
               {/* SEO Section */}
@@ -822,6 +1041,7 @@ const OrdersManager = () => {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -841,7 +1061,155 @@ const OrdersManager = () => {
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [filterStatus, searchQuery]);
-  const handleStatusChange = async (id, status) => { try { await updateOrderStatus(id, status); fetchOrders(); } catch (e) { alert('Error updating status'); } };
+
+  const handleStatusChange = async (id, status, e) => {
+    // Prevent row click propagation
+    e?.stopPropagation();
+    try {
+      await updateOrderStatus(id, status);
+      fetchOrders();
+    } catch (e) { alert('Error updating status'); }
+  };
+
+  const handleRowClick = (order) => {
+    setSelectedOrder(order);
+  };
+
+  const handlePrintInvoice = (order) => {
+    const printWindow = window.open('', '_blank');
+    const invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice #${order.id}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+          body { font-family: 'Inter', sans-serif; color: #1e293b; line-height: 1.5; margin: 0; padding: 0; background-color: #f8fafc; }
+          .invoice-container { max-width: 800px; margin: 40px auto; background: white; padding: 48px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border-radius: 8px; }
+          
+          /* Header */
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 48px; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; }
+          .brand h1 { margin: 0; color: #2563eb; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+          .brand p { margin: 4px 0 0; color: #64748b; font-size: 14px; }
+          .invoice-details { text-align: right; }
+          .invoice-title { font-size: 36px; font-weight: 800; color: #0f172a; margin: 0; line-height: 1; opacity: 0.1; letter-spacing: 2px; text-transform: uppercase; }
+          .invoice-id { font-size: 16px; font-weight: 600; color: #475569; margin-top: 8px; }
+
+          /* Info Grid */
+          .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 48px; margin-bottom: 48px; }
+          .info-group h3 { margin: 0 0 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
+          .info-group p { margin: 0; font-size: 14px; color: #334155; }
+          .info-group strong { color: #0f172a; font-weight: 600; }
+          
+          /* Table */
+          table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+          th { text-align: left; padding: 12px 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #64748b; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+          td { padding: 16px; font-size: 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+          tr:last-child td { border-bottom: none; }
+          .col-right { text-align: right; }
+          .item-name { font-weight: 600; color: #0f172a; }
+
+          /* Summary */
+          .summary { display: flex; justify-content: flex-end; }
+          .summary-box { width: 300px; background: #f8fafc; padding: 24px; border-radius: 8px; }
+          .summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #64748b; }
+          .summary-row.total { margin-top: 16px; pt-16px; border-top: 2px solid #e2e8f0; font-weight: 700; color: #0f172a; font-size: 18px; align-items: center; }
+          
+          /* Footer */
+          .footer { margin-top: 64px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 24px; }
+          .footer p { font-size: 12px; color: #94a3b8; margin: 4px 0; }
+          .heart { color: #ef4444; }
+
+          @media print {
+            body { background: white; }
+            .invoice-container { margin: 0; padding: 0; box-shadow: none; max-width: 100%; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-container">
+          <div class="header">
+            <div class="brand">
+              <h1>MYSTORE</h1>
+              <p>Top Quality Products, Delivered.</p>
+            </div>
+            <div class="invoice-details">
+              <h2 class="invoice-title">INVOICE</h2>
+              <p class="invoice-id">#${order.id}</p>
+            </div>
+          </div>
+          
+          <div class="info-grid">
+            <div class="info-group">
+              <h3>Billed To</h3>
+              <p><strong>${order.customerName}</strong></p>
+              <p>${order.customerEmail || 'No Email Provided'}</p>
+              <p>${order.customerPhone || 'No Phone Provided'}</p>
+              <p>${order.shippingAddress ? order.shippingAddress.addressLine1 : ''}</p>
+              <p>${order.shippingAddress ? order.shippingAddress.city + ', ' + (order.shippingAddress.postalCode || '') : ''}</p>
+            </div>
+            <div class="info-group">
+              <h3>Order Details</h3>
+              <p><strong>Date Issued:</strong> ${new Date(order.createdAt).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              <p><strong>Order Status:</strong> <span style="text-transform: capitalize">${order.status.toLowerCase()}</span></p>
+              <p><strong>Payment Method:</strong> ${order.paymentMethod || 'Cash On Delivery'}</p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th width="50%">Item Description</th>
+                <th width="15%" class="col-right">Price</th>
+                <th width="15%" class="col-right">Qty</th>
+                <th width="20%" class="col-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items.map(item => `
+                <tr>
+                  <td><span class="item-name">${item.productName}</span></td>
+                  <td class="col-right">৳${item.price}</td>
+                  <td class="col-right">${item.quantity}</td>
+                  <td class="col-right"><strong>৳${(item.price * item.quantity).toFixed(2)}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="summary">
+            <div class="summary-box">
+              <div class="summary-row">
+                <span>Subtotal</span>
+                <span>৳${order.totalAmount}</span>
+              </div>
+              <div class="summary-row">
+                <span>Shipping</span>
+                <span>৳0.00</span>
+              </div>
+              <div class="summary-row total">
+                <span>Total Due</span>
+                <span style="color: #2563eb">৳${order.totalAmount}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <p>Thank you for shopping with us! <span class="heart">♥</span></p>
+            <p>For support, email support@mystore.com or call +880-123-456-789</p>
+            <p><strong>Terms & Conditions:</strong> Goods once sold cannot be returned after 7 days.</p>
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(invoiceHTML);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -867,7 +1235,301 @@ const OrdersManager = () => {
           <button onClick={fetchOrders} className="text-blue-600 hover:underline text-sm font-medium">Refresh</button>
         </div>
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-50 border-b border-gray-100"><tr><th className="p-4">ID</th><th className="p-4">Customer</th><th className="p-4">Total</th><th className="p-4 w-40">Tracking Status</th></tr></thead><tbody className="divide-y divide-gray-100">{orders.map(o => (<tr key={o.id}><td className="p-4">#{o.id}</td><td className="p-4">{o.customerName}<br /><span className="text-xs text-gray-500">{o.customerEmail}</span></td><td className="p-4">${o.totalAmount}</td><td className="p-4"><select value={o.status} onChange={(e) => handleStatusChange(o.id, e.target.value)} className={`border rounded p-1 text-sm font-semibold ${o.status === 'DELIVERED' ? 'text-green-700 bg-green-100' : o.status === 'CANCELLED' ? 'text-red-700 bg-red-100' : 'text-blue-700 bg-blue-100'}`}>{['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map(s => <option key={s} value={s}>{s}</option>)}</select></td></tr>))}</tbody></table></div></div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="p-4">ID</th>
+              <th className="p-4">Customer</th>
+              <th className="p-4">Total</th>
+              <th className="p-4 w-40">Tracking Status</th>
+              <th className="p-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {orders.map(o => (
+              <tr
+                key={o.id}
+                onClick={() => handleRowClick(o)}
+                className="cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <td className="p-4">#{o.id}</td>
+                <td className="p-4">{o.customerName}<br /><span className="text-xs text-gray-500">{o.customerEmail}</span></td>
+                <td className="p-4">৳{o.totalAmount}</td>
+                <td className="p-4">
+                  <select
+                    value={o.status}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => handleStatusChange(o.id, e.target.value, e)}
+                    className={`border rounded p-1 text-sm font-semibold ${o.status === 'DELIVERED' ? 'text-green-700 bg-green-100' : o.status === 'CANCELLED' ? 'text-red-700 bg-red-100' : 'text-blue-700 bg-blue-100'}`}
+                  >
+                    {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td className="p-4 text-right">
+                  <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-full" title="View Details">
+                    <ExternalLink size={16} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800">Order #{selectedOrder.id}</h3>
+                <p className="text-sm text-gray-500">
+                  Placed on {new Date(selectedOrder.createdAt).toLocaleDateString()} at {new Date(selectedOrder.createdAt).toLocaleTimeString()}
+                </p>
+              </div>
+              <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-red-500"><XCircle size={28} /></button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Customer Info */}
+              <div className="space-y-4">
+                <h4 className="font-bold text-lg border-b pb-2">Customer Details</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Name</p>
+                    <p className="font-medium">{selectedOrder.customerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Email</p>
+                    <p className="font-medium">{selectedOrder.customerEmail || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+                    <p className="font-medium max-w-[150px] truncate" title={selectedOrder.customerName}>{selectedOrder.customerPhone || selectedOrder.shippingAddress?.phone || 'N/A'}</p>
+                  </div>
+                  {/* New IP Address Field */}
+                  <div>
+                    <p className="text-gray-500">IP Address</p>
+                    <p className="font-medium font-mono text-xs bg-gray-100 p-1 rounded inline-block">{selectedOrder.ipAddress || 'Not Recorded'}</p>
+                  </div>
+                </div>
+
+                <h4 className="font-bold text-lg border-b pb-2 mt-6">Shipping Address</h4>
+                {selectedOrder.shippingAddress ? (
+                  <div className="text-sm space-y-1">
+                    <p className="font-medium">{selectedOrder.shippingAddress.fullName}</p>
+                    <p>{selectedOrder.shippingAddress.addressLine1}</p>
+                    {(selectedOrder.shippingAddress.addressLine2) && <p>{selectedOrder.shippingAddress.addressLine2}</p>}
+                    <p>{selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.postalCode}</p>
+                    <p>{selectedOrder.shippingAddress.country}</p>
+                    <p className="text-gray-500 mt-2">Phone: {selectedOrder.shippingAddress.phone}</p>
+                  </div>
+                ) : <p className="text-sm text-gray-400">No Shipping Info</p>}
+              </div>
+
+              {/* Order Items */}
+              <div className="space-y-4">
+                <h4 className="font-bold text-lg border-b pb-2">Order Summary</h4>
+                <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
+                  <ul className="space-y-3">
+                    {selectedOrder.items?.map((item, idx) => (
+                      <li key={idx} className="flex justify-between items-center text-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white border rounded flex items-center justify-center text-xs text-gray-400">
+                            {/* If we had item image, we'd show it here. Assuming item structure. */}
+                            ITM
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">{item.productName || `Product #${item.productId}`}</p>
+                            <p className="text-gray-500">Qty: {item.quantity}</p>
+                          </div>
+                        </div>
+                        <p className="font-semibold">৳{(item.price * item.quantity).toFixed(2)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Totals */}
+                <div className="space-y-2 border-t pt-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Subtotal</span>
+                    <span>৳{selectedOrder.totalAmount}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Shipping</span>
+                    <span>৳0.00</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-gray-800 border-t border-dashed pt-2">
+                    <span>Total</span>
+                    <span>৳{selectedOrder.totalAmount}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-6 bg-gray-50 border-t flex justify-end gap-3 rounded-b-xl">
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Close
+              </button>
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                onClick={() => handlePrintInvoice(selectedOrder)}
+              >
+                <ExternalLink size={16} /> Print Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminsManager = () => {
+  const [admins, setAdmins] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', roleId: '' });
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Fetch Roles
+      try {
+        const resRoles = await getRoles();
+        console.log("Raw Roles Response:", resRoles);
+        const rolesData = resRoles.data || resRoles;
+        if (Array.isArray(rolesData)) {
+          setRoles(rolesData);
+        } else {
+          console.error("Roles data is not an array:", rolesData);
+          setRoles([]);
+        }
+      } catch (roleError) {
+        console.error("Failed to fetch roles:", roleError);
+      }
+
+      // Fetch Admins
+      try {
+        const resAdmins = await getAdmins();
+        const adminsData = resAdmins.data || resAdmins;
+        setAdmins(Array.isArray(adminsData) ? adminsData : []);
+      } catch (adminError) {
+        console.error("Failed to fetch admins:", adminError);
+      }
+
+    } catch (e) {
+      console.error("Global fetch error in AdminsManager", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      await registerAdmin({
+        ...formData,
+        roleId: parseInt(formData.roleId)
+      });
+      alert("Admin Created Successfully!");
+      setIsModalOpen(false);
+      setFormData({ name: '', email: '', password: '', roleId: '' });
+      fetchData();
+    } catch (err) {
+      alert(err.message || "Failed to create admin");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Admin Users & Access Control</h2>
+        <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded flex gap-2 font-bold hover:bg-blue-700">
+          <Plus size={18} /> Create New Admin
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="p-4">Name</th>
+              <th className="p-4">Email</th>
+              <th className="p-4">Role</th>
+              <th className="p-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {loading && <tr><td colSpan="4" className="p-6 text-center">Loading...</td></tr>}
+            {!loading && admins.map(admin => (
+              <tr key={admin.id}>
+                <td className="p-4 font-medium">{admin.name}</td>
+                <td className="p-4 text-gray-500">{admin.email}</td>
+                <td className="p-4">
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${admin.role.name === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
+                    {admin.role.name}
+                  </span>
+                </td>
+                <td className="p-4 text-gray-400 text-sm">
+                  {admin.role.name === 'SUPER_ADMIN' ? 'Restricted' : <button className="hover:text-red-600">Remove</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <h3 className="text-xl font-bold">Create New Admin</h3>
+              <button onClick={() => setIsModalOpen(false)}><XCircle className="text-gray-400 hover:text-red-500" /></button>
+            </div>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
+                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="John Doe" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
+                <input type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@example.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+                <input type="password" required value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Assign Role</label>
+                <select required value={formData.roleId} onChange={e => setFormData({ ...formData, roleId: e.target.value })} className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  <option value="">Select Role...</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Super Admin has full access. Managers have limited access.</p>
+              </div>
+
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-transform active:scale-95">
+                Create Admin User
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

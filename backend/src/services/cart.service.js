@@ -15,17 +15,17 @@ const cartInclude = {
 };
 
 class CartService {
- 
+
   static async getOrCreateCartByUserId(userId) {
     let cart = await prisma.cart.findUnique({
       where: { userId },
-      include: cartInclude, 
+      include: cartInclude,
     });
 
     if (!cart) {
       cart = await prisma.cart.create({
         data: { userId },
-        include: cartInclude, 
+        include: cartInclude,
       });
     }
     return cart;
@@ -34,28 +34,38 @@ class CartService {
 
   static async getOrCreateCartByOwner({ userId, guestCartId }) {
     if (userId) {
-      const cart = await prisma.cart.upsert({
-        where: { userId },
-        update: {},
-        create: { userId },
-        include: cartInclude, 
-      });
-      return { cart };
+      try {
+        const cart = await prisma.cart.upsert({
+          where: { userId },
+          update: {},
+          create: { userId },
+          include: cartInclude,
+        });
+        return { cart };
+      } catch (error) {
+        // If userId is not found in User table (e.g. it's an Admin ID), fall back to guest logic
+        if (error.code === 'P2003') {
+          console.warn(`CartService: Invalid userId ${userId} (likely Admin), falling back to guest cart.`);
+          // proceed to guest logic
+        } else {
+          throw error;
+        }
+      }
     }
 
     if (guestCartId) {
       const cart = await prisma.cart.findUnique({
         where: { id: guestCartId },
-        include: cartInclude, 
+        include: cartInclude,
       });
       if (cart) {
-        return { cart }; 
+        return { cart };
       }
     }
 
     const newCart = await prisma.cart.create({
       data: {},
-      include: cartInclude, 
+      include: cartInclude,
     });
     return { cart: newCart, newGuestCartId: newCart.id };
   }
@@ -71,11 +81,26 @@ class CartService {
 
     let cart;
     if (userId) {
-      cart = await prisma.cart.upsert({
-        where: { userId },
-        update: {},
-        create: { userId },
-      });
+      try {
+        cart = await prisma.cart.upsert({
+          where: { userId },
+          update: {},
+          create: { userId },
+        });
+      } catch (error) {
+        if (error.code === 'P2003') {
+          console.warn(`CartService addItem: Invalid userId ${userId}, treating as guest.`);
+          // If passed a cartId, use it, else create new
+          if (cartId) {
+            cart = await prisma.cart.findUnique({ where: { id: cartId } });
+            if (!cart) throw new ApiError(404, 'Guest cart not found.');
+          } else {
+            cart = await prisma.cart.create({ data: {} });
+          }
+        } else {
+          throw error;
+        }
+      }
     } else if (cartId) {
       cart = await prisma.cart.findUnique({ where: { id: cartId } });
       if (!cart) throw new ApiError(404, 'Guest cart not found.');
@@ -105,14 +130,14 @@ class CartService {
       });
     }
 
-   
+
     return await prisma.cart.findUnique({
       where: { id: cart.id },
-      include: cartInclude, 
+      include: cartInclude,
     });
   }
 
- 
+
   static async updateItemQuantity({ cartItemId, quantity, userId, cartId }) {
     const idAsInt = parseInt(cartItemId);
     if (isNaN(idAsInt)) {
@@ -120,7 +145,7 @@ class CartService {
     }
 
     const item = await prisma.cartItem.findUnique({
-      where: { id: idAsInt }, 
+      where: { id: idAsInt },
     });
 
     if (!item) {
@@ -149,7 +174,7 @@ class CartService {
         data: { quantity },
       });
     }
-    
+
     // Return the correct cart
     if (userId) {
       return this.getOrCreateCartByUserId(userId);

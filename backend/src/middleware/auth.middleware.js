@@ -62,8 +62,22 @@ const authorize = (permission) => {
   });
 };
 
+/**
+ * Middleware to check if the user has a specific role name (e.g. SUPER_ADMIN).
+ */
+const authorizeRole = (roleName) => {
+  return (req, res, next) => {
+    if (req.user && req.user.role === roleName) {
+      next();
+    } else {
+      next(new ApiError(403, `Forbidden: Requires ${roleName} role.`));
+    }
+  };
+};
+
 module.exports = {
   authenticate,
   authorize,
-  sofAuthenticate
+  sofAuthenticate,
+  authorizeRole,
 };

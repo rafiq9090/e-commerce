@@ -18,3 +18,30 @@ export const loginAdmin = async (email, password) => {
     throw error.response?.data || error;
   }
 };
+
+export const registerAdmin = async (adminData) => {
+  try {
+    const response = await apiClient.post('/admin/register', adminData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const getRoles = async () => {
+  try {
+    const response = await apiClient.get('/admin/roles');
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+}
+
+export const getAdmins = async () => {
+  try {
+    const response = await apiClient.get('/admin/admins');
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+}

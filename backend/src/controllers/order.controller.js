@@ -8,7 +8,7 @@ const ApiError = require('../utils/ApiError');
 const placeOrder = asyncHandler(async (req, res) => {
   const userId = req.user?.id || null;
   const orderData = req.body;
-  const ipAddress = req.ip;
+  const ipAddress = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || req.ip;
 
   if (!orderData) {
     throw new ApiError(400, 'Order data is required');
@@ -60,7 +60,7 @@ const cancelOrder = asyncHandler(async (req, res) => {
 // --- Public Tracking ---
 const trackOrderPublic = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
-  
+
   if (!orderId) {
     throw new ApiError(400, 'Order ID is required');
   }
@@ -72,7 +72,7 @@ const trackOrderPublic = asyncHandler(async (req, res) => {
 const trackOrderSecure = asyncHandler(async (req, res) => {
   const { orderId, email, phone } = req.body;
   const identifier = email || phone;
-  
+
   if (!orderId || !identifier) {
     throw new ApiError(400, 'Order ID and email/phone are required');
   }
@@ -107,7 +107,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
 const getOrderStatistics = asyncHandler(async (req, res) => {
   const { period = 'month' } = req.query;
-  
+
   const validPeriods = ['day', 'week', 'month', 'year'];
   if (!validPeriods.includes(period)) {
     throw new ApiError(400, 'Invalid period. Use: day, week, month, year');

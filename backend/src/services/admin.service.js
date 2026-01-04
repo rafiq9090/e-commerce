@@ -57,7 +57,7 @@ class AdminService {
     const token = jwt.sign(
       { id: admin.id, email: admin.email, role: admin.role.name },
       process.env.JWT_SECRET,
-     { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
     const adminToReturn = {
@@ -68,6 +68,28 @@ class AdminService {
     };
 
     return { token, admin: adminToReturn };
+  }
+
+
+  static async getAllAdmins() {
+    return await prisma.adminUser.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
+    });
+  }
+
+  static async getRoles() {
+    return await prisma.adminRole.findMany();
   }
 }
 

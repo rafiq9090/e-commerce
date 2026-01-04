@@ -6,7 +6,7 @@ const ActivityLogService = require('./activityLog.service');
 class ProductService {
   static async createProduct(productData) {
     const { inventory, ...data } = productData;
-    const { name, description, short_description, regular_price, sale_price, categoryId, supplierId, status, seoTitle, seoDescription, seoKeywords, isFeatured } = data;
+    const { name, description, short_description, regular_price, sale_price, categoryId, supplierId, status, seoTitle, seoDescription, seoKeywords, isFeatured, images } = data;
 
     // Better slug generation with uniqueness check
     let slug = name.toLowerCase().split(' ').join('-');
@@ -28,6 +28,16 @@ class ProductService {
       inventoryData = inventory; // Assume it's already { quantity: 50, sku: '...' }
     }
 
+    // Prepare images data
+    let imagesData = [];
+    if (Array.isArray(images) && images.length > 0) {
+      imagesData = images.map((img, index) => ({
+        url: img.url,
+        altText: name,
+        isFeatured: index === 0 // First image is featured
+      }));
+    }
+
     return await prisma.product.create({
       data: {
         name,
@@ -46,6 +56,9 @@ class ProductService {
         inventory: {
           create: inventoryData
         },
+        images: {
+          create: imagesData
+        }
       },
       include: {
         inventory: true,
@@ -177,7 +190,7 @@ class ProductService {
 
   static async updateProduct(productId, productData, adminId) {
     const { inventory, ...data } = productData;
-    const { isFeatured, name, description, short_description, regular_price, sale_price, status, categoryId, supplierId, seoTitle, seoDescription, seoKeywords } = data;
+    const { isFeatured, name, description, short_description, regular_price, sale_price, status, categoryId, supplierId, seoTitle, seoDescription, seoKeywords, images } = data;
 
     let slug;
     if (name) {
@@ -223,6 +236,25 @@ class ProductService {
 
       updateData.inventory = {
         update: inventoryData
+      };
+    }
+
+    // Handle Images: Delete old ones and create new ones if 'images' array is provided
+    // Note: This is a robust strategy for "replacing" the list.
+    if (Array.isArray(images)) {
+      // Use a transaction to modify relation
+      // We can't do deleteMany inside regular update directly in same step nicely for one-to-many
+      // So we will perform a transaction wrapper or two steps.
+      // For simplicity, we'll do delete + create inside an interactive transaction, 
+      // BUT prisma update allows 'deleteMany' then 'create'.
+
+      updateData.images = {
+        deleteMany: {}, // Delete ALL existing images for this product
+        create: images.map((img, index) => ({
+          url: img.url,
+          altText: name || 'Product Image', // Fallback
+          isFeatured: index === 0
+        }))
       };
     }
 

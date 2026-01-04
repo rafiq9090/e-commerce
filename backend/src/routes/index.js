@@ -16,6 +16,7 @@ const testimonialRoutes = require('./testimonial.routes');
 const blocklistRoutes = require('./blocklist.routes');
 const activityLogRoutes = require('./activityLog.routes');
 const contentRoutes = require('./content.routes');
+const uploadRoutes = require('./upload.routes');
 
 
 // Use module routers
@@ -26,11 +27,12 @@ router.use('/categories', categoryRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/cart', cartRoutes);
 router.use('/orders', orderRoutes);
-router.use('/user', userRoutes); 
+router.use('/user', userRoutes);
 router.use('/menus', menuRoutes);
 router.use('/testimonials', testimonialRoutes);
 router.use('/blocklist', blocklistRoutes);
 router.use('/activity-log', activityLogRoutes);
 router.use('/content', contentRoutes);
+router.use('/upload', uploadRoutes);
 
 module.exports = router;

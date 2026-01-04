@@ -21,11 +21,15 @@ class ContentService {
    * @param {Array<{key: string, value: string}>} contentUpdates - e.g., [{key: "footer_copyright", value: "New Text"}]
    */
   static async updateContent(contentUpdates) {
+    // Ensure contentUpdates is an array
+    const updates = Array.isArray(contentUpdates) ? contentUpdates : [contentUpdates];
+
     // Use a transaction to ensure all updates succeed or none do
-    const transactions = contentUpdates.map(item => 
-      prisma.siteContent.update({
+    const transactions = updates.map(item =>
+      prisma.siteContent.upsert({
         where: { key: item.key },
-        data: { value: item.value },
+        update: { value: item.value, type: item.type || 'TEXT' },
+        create: { key: item.key, value: item.value, type: item.type || 'TEXT' },
       })
     );
 
