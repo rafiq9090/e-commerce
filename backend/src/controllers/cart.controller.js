@@ -49,10 +49,10 @@ const addItem = asyncHandler(async (req, res) => {
 const updateItem = asyncHandler(async (req, res) => {
   const userId = req.user ? req.user.id : null;
   const guestCartId = req.cookies.guestCartId || null;
-  
+
   // This was the bug. It is now fixed.
-  const { itemId } = req.params; 
-  
+  const { itemId } = req.params;
+
   const { quantity } = req.body;
 
   const cart = await CartService.updateItemQuantity({
@@ -69,7 +69,7 @@ const updateItem = asyncHandler(async (req, res) => {
 const removeItem = asyncHandler(async (req, res) => {
   const userId = req.user ? req.user.id : null;
   const guestCartId = req.cookies.guestCartId || null;
-  const { itemId } = req.params; 
+  const { itemId } = req.params;
 
   const cart = await CartService.removeItemFromCart({
     cartItemId: itemId,
@@ -80,9 +80,22 @@ const removeItem = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, cart, 'Item removed from cart'));
 });
 
+const clearCart = asyncHandler(async (req, res) => {
+  const userId = req.user ? req.user.id : null;
+  const guestCartId = req.cookies.guestCartId || null;
+
+  const cart = await CartService.clearCart({
+    userId,
+    cartId: guestCartId,
+  });
+
+  res.status(200).json(new ApiResponse(200, cart, 'Cart cleared successfully'));
+});
+
 module.exports = {
   getCart,
   addItem,
   updateItem,
   removeItem,
+  clearCart,
 };

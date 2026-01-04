@@ -4,7 +4,7 @@ const ApiError = require('../utils/ApiError');
 
 class BlocklistService {
     static async addToBlocklist(data) {
-        const { type, value , reason} = data;
+        const { type, value, reason } = data;
         try {
             return await prisma.blockedList.create({
                 data: {
@@ -20,7 +20,7 @@ class BlocklistService {
             throw error;
         }
     }
-    static async getAllBlocked(){
+    static async getAllBlocked() {
         return await prisma.blockedList.findMany({
             orderBy: { createdAt: 'desc' },
         });
@@ -33,19 +33,23 @@ class BlocklistService {
         });
     }
 
-    static async isBlocked(ip, phone) {
-    if (!ip && !phone) return false;
+    static async isBlocked(ip, phone, email) {
+        if (!ip && !phone && !email) return false;
 
-    const blockedEntry = await prisma.blockedList.findFirst({
-      where: {
-        OR: [
-          { type: 'IP', value: ip },
-          { type: 'PHONE', value: phone },
-        ],
-      },
-    });
+        const conditions = [];
+        if (ip) conditions.push({ type: 'IP', value: ip });
+        if (phone) conditions.push({ type: 'PHONE', value: phone });
+        if (email) conditions.push({ type: 'EMAIL', value: email });
 
-    return !!blockedEntry; 
-  }
+        if (conditions.length === 0) return false;
+
+        const blockedEntry = await prisma.blockedList.findFirst({
+            where: {
+                OR: conditions,
+            },
+        });
+
+        return !!blockedEntry;
+    }
 }
 module.exports = BlocklistService;

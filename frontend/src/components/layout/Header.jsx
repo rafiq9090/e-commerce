@@ -3,8 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getUserProfile } from "../../api/authApi";
 import { useCart } from "../../context/CartContext";
+import { getAllContent } from "../../api/contentApi";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, Search, ShoppingCart, User, Home, Package, Truck } from "lucide-react";
+import { Menu, X, Search, ShoppingCart, User, Home, Package, Truck, Phone, Bell } from "lucide-react";
 
 // Import separate components
 import DesktopSearch from "./DesktopSearch";
@@ -21,11 +22,40 @@ const Header = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [profile, setProfile] = useState(null);
-  
+  const [siteContent, setSiteContent] = useState({});
+
   const userMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
-  // Fetch user profile
+  // Fetch Site Content (Public)
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const res = await getAllContent();
+        console.log("Header Content Response:", res); // Debug log
+        const data = res.data || res;
+
+        // Backend now returns a mapped object { key: value }, perfectly matching what we need.
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setSiteContent(data);
+        }
+        // Fallback for if it ever returns an array (old behavior)
+        else if (Array.isArray(data)) {
+          const contentMap = {};
+          data.forEach(c => contentMap[c.key] = c.value);
+          setSiteContent(contentMap);
+        }
+        else {
+          console.error("Content API format error: Unexpected format", data);
+        }
+      } catch (error) {
+        console.error("Error fetching site content:", error);
+      }
+    };
+    fetchContent();
+  }, []);
+
+  // Fetch User Profile (Auth dependent)
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -47,10 +77,10 @@ const Header = () => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserMenuOpen(false);
       }
-      
-      if (mobileMenuOpen && mobileMenuRef.current && 
-          !mobileMenuRef.current.contains(e.target) && 
-          !e.target.closest('button[aria-label="mobile menu"]')) {
+
+      if (mobileMenuOpen && mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(e.target) &&
+        !e.target.closest('button[aria-label="mobile menu"]')) {
         setMobileMenuOpen(false);
       }
     };
@@ -98,10 +128,33 @@ const Header = () => {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
+      {/* Dynamic Top Navbar */}
+      {/* Dynamic Top Navbar */}
+      {siteContent.show_top_navbar === 'true' && (siteContent.top_bar_announcement || siteContent.contact_phone) && (
+        <div className="bg-slate-900 text-white text-xs py-2 px-4 transition-all duration-300">
+          <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-2">
+            <div className="flex items-center gap-2">
+              {siteContent.top_bar_announcement && (
+                <span className="flex items-center gap-1 font-medium tracking-wide">
+                  <Bell size={12} className="text-yellow-400" />
+                  {siteContent.top_bar_announcement}
+                </span>
+              )}
+            </div>
+            {siteContent.contact_phone && (
+              <a href={`tel:${siteContent.contact_phone}`} className="flex items-center gap-1 hover:text-blue-300 transition-colors">
+                <Phone size={12} />
+                <span className="font-semibold">{siteContent.contact_phone}</span>
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <nav className="container mx-auto flex justify-between items-center p-4">
         {/* Logo */}
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="text-2xl font-bold text-blue-600 flex items-center"
           onClick={() => handleNavigation()}
         >
@@ -109,15 +162,15 @@ const Header = () => {
         </Link>
 
         {/* Desktop Search */}
-        <DesktopSearch 
+        <DesktopSearch
           searchOpen={searchOpen}
           setSearchOpen={setSearchOpen}
         />
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center space-x-6">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="hover:text-blue-600 transition font-semibold"
             onClick={() => handleNavigation()}
           >
@@ -130,16 +183,16 @@ const Header = () => {
           >
             Products
           </Link>
-          <Link 
+          <Link
             to="/track-order"
             className="hover:text-blue-600 transition font-semibold"
             onClick={() => handleNavigation()}
           >
             Track Order
           </Link>
-         
+
           {/* Cart */}
-          <Link 
+          <Link
             to="/cart"
             className="relative hover:text-blue-600 transition font-semibold flex items-center gap-1"
             onClick={() => handleNavigation()}
@@ -155,7 +208,7 @@ const Header = () => {
 
           {/* Auth Section */}
           {isAuthenticated ? (
-            <UserMenu 
+            <UserMenu
               userMenuOpen={userMenuOpen}
               setUserMenuOpen={setUserMenuOpen}
               userMenuRef={userMenuRef}
@@ -195,8 +248,8 @@ const Header = () => {
             <Search size={20} />
           </button>
 
-          <Link 
-            to="/cart" 
+          <Link
+            to="/cart"
             className="relative p-2 hover:text-blue-600 transition"
             onClick={() => handleNavigation()}
           >
@@ -219,13 +272,13 @@ const Header = () => {
       </nav>
 
       {/* Mobile Search Overlay */}
-      <MobileSearch 
+      <MobileSearch
         searchOpen={searchOpen}
         setSearchOpen={setSearchOpen}
       />
 
       {/* Mobile Menu */}
-      <MobileMenu 
+      <MobileMenu
         mobileMenuOpen={mobileMenuOpen}
         mobileMenuRef={mobileMenuRef}
         closeMobileMenu={closeMobileMenu}

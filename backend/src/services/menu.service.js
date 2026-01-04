@@ -6,7 +6,12 @@ class MenuService {
   // --- Menu Management ---
 
   static async createMenu(menuData) {
-    return prisma.menu.create({ data: menuData });
+    const { items, ...rest } = menuData;
+    const data = { ...rest };
+    if (items && Array.isArray(items) && items.length > 0) {
+      data.items = { create: items };
+    }
+    return prisma.menu.create({ data });
   }
 
   static async getAllMenus() {

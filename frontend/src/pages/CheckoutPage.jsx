@@ -3,12 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { placeOrder } from '../api/orderApi';
-import { 
-  ShoppingBag, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  ShoppingBag,
+  User,
+  Mail,
+  Phone,
+  MapPin,
   CreditCard,
   CheckCircle,
   AlertCircle,
@@ -21,7 +21,7 @@ import {
 
 const CheckoutPage = () => {
   const { isAuthenticated, user } = useAuth();
-  const { cart, cartItems, fetchCart, clearCart } = useCart(); 
+  const { cart, cartItems, fetchCart, clearCart, clearCartImmediate } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -117,59 +117,53 @@ const CheckoutPage = () => {
         }));
 
         orderData = {
+          cartId: cart?.id,
           items: items,
           fullAddress,
           phone,
           paymentMethod: "Cash on Delivery",
-          guestDetails: { 
-            name: name.trim(), 
-            phone: phone.trim(), 
-            email: email.trim() || undefined 
+          guestDetails: {
+            name: name.trim(),
+            phone: phone.trim(),
+            email: email.trim() || undefined
           },
         };
       }
 
       console.log('Placing order with data:', orderData);
       const apiResponse = await placeOrder(orderData);
-      
-       if (isAuthenticated) {
+
+      // ✅ Cart Clearing Logic (Simplified & Robust)
       try {
+        // 1. Immediately clear UI state
         clearCartImmediate();
-        console.log('Cart cleared immediately after order');
-        
-        setTimeout(async () => {
-          try {
-            await clearCart();
-            await fetchCart();
-            console.log('Cart synced with backend');
-          } catch (syncError) {
-            console.warn('Cart sync failed, but UI is updated:', syncError);
-          }
-        }, 1000);
-        
-      } catch (clearCartError) {
-        console.warn('Failed to clear cart, but order was placed:', clearCartError);
+
+        // 2. Sync with backend (fire and forget)
+        // We use the new API-based clearCart from context
+        clearCart().catch(e => console.warn('Background clear cart failed', e));
+
+      } catch (e) {
+        console.warn('Frontend clear cart error:', e);
       }
+
+      navigate('/order-success', {
+        state: {
+          order: apiResponse.data,
+          isGuest: !isAuthenticated,
+          orderItems: orderItems,
+          totalAmount: totalPrice,
+          cartCleared: true
+        }
+      });
+
+    } catch (err) {
+      console.error('Order placement error:', err);
+      setError(err.response?.data?.message || err.message || "Failed to place order. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    
-    navigate('/order-success', { 
-      state: { 
-        order: apiResponse.data,
-        isGuest: !isAuthenticated,
-        orderItems: orderItems,
-        totalAmount: totalPrice,
-        cartCleared: true
-      } 
-    });
-    
-  } catch (err) {
-    console.error('Order placement error:', err);
-    setError(err.response?.data?.message || err.message || "Failed to place order. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
- 
+  };
+
 
 
   // ✅ FIXED: Improved cart clearing with better error handling
@@ -182,12 +176,12 @@ const CheckoutPage = () => {
       console.log('Attempting to clear cart...');
       await clearCart();
       console.log('Cart cleared successfully');
-      
+
       // Refresh cart data in context
       setTimeout(() => {
         fetchCart();
       }, 500);
-      
+
       return true;
     } catch (error) {
       console.error('Failed to clear cart:', error);
@@ -206,8 +200,8 @@ const CheckoutPage = () => {
           </div>
           <h2 className="text-3xl font-black text-gray-900 mb-4">Your Cart is Empty</h2>
           <p className="text-gray-600 mb-8 text-lg">
-            {isAuthenticated 
-              ? 'Add some amazing products to your cart to get started!' 
+            {isAuthenticated
+              ? 'Add some amazing products to your cart to get started!'
               : 'Browse our products or use "Order Now" from any product page.'
             }
           </p>
@@ -272,14 +266,14 @@ const CheckoutPage = () => {
           {/* Left: Checkout Form */}
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
-              
+
               {/* Personal Information Section */}
               <div className="mb-8">
                 <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-3">
                   <div className="w-1 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></div>
                   Personal Information
                 </h2>
-                
+
                 <div className="space-y-5">
                   {/* Name */}
                   <div>
@@ -339,7 +333,7 @@ const CheckoutPage = () => {
                   <div className="w-1 h-8 bg-gradient-to-b from-purple-600 to-pink-600 rounded-full"></div>
                   Shipping Address
                 </h2>
-                
+
                 <div className="space-y-5">
                   {/* Street Address */}
                   <div>
@@ -436,11 +430,10 @@ const CheckoutPage = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-5 px-8 rounded-2xl transition-all transform shadow-lg flex items-center justify-center gap-3 text-lg ${
-                  loading 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'hover:from-blue-700 hover:to-indigo-700 hover:scale-105 hover:shadow-xl'
-                }`}
+                className={`w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-5 px-8 rounded-2xl transition-all transform shadow-lg flex items-center justify-center gap-3 text-lg ${loading
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:from-blue-700 hover:to-indigo-700 hover:scale-105 hover:shadow-xl'
+                  }`}
               >
                 {loading ? (
                   <>
@@ -460,8 +453,8 @@ const CheckoutPage = () => {
                 <div className="mt-6 text-center">
                   <p className="text-gray-600">
                     Have an account?{' '}
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
                       onClick={() => navigate('/login', { state: { from: location } })}
                     >

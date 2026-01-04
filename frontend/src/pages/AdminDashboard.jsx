@@ -119,8 +119,6 @@ const AdminDashboard = () => {
             active={activeTab === 'products'}
             onClick={() => handleTabChange('products')}
             isOpen={isSidebarOpen}
-            badge={counts.products > 0 ? counts.products : null}
-            badgeColor="bg-blue-600"
           />
 
           <SidebarItem
@@ -299,10 +297,10 @@ const MenusManager = () => {
   const [menus, setMenus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedMenu, setExpandedMenu] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [newItemData, setNewItemData] = useState({ title: '', link: '', order: 0 });
-  // Currently only supporting adding to menu, not creating new menus in this simplified view
-  // Ideally would have Create Menu feature too.
+  const [newMenuName, setNewMenuName] = useState('');
 
   const fetchMenus = async () => {
     setLoading(true);
@@ -314,15 +312,22 @@ const MenusManager = () => {
   useEffect(() => { fetchMenus(); }, []);
 
   const handleCreateMenu = async () => {
-    const name = prompt("Enter menu name (e.g., 'main-menu', 'footer-menu'):");
-    if (!name) return;
-    try { await createMenu({ name, items: [] }); fetchMenus(); } catch (e) { alert("Failed to create"); }
+    if (!newMenuName) return;
+    try {
+      await createMenu({ name: newMenuName });
+      fetchMenus();
+      setIsMenuModalOpen(false);
+      setNewMenuName('');
+    } catch (e) {
+      console.error(e);
+      alert("Failed to create menu: " + (e.response?.data?.message || e.message));
+    }
   };
 
   const handleAddItem = async (menuId) => {
     try {
       await addMenuItem({ ...newItemData, menuId, order: parseInt(newItemData.order) });
-      setIsModalOpen(false); setNewItemData({ title: '', link: '', order: 0 }); fetchMenus();
+      setIsItemModalOpen(false); setNewItemData({ title: '', link: '', order: 0 }); fetchMenus();
     } catch (e) { alert("Failed to add item"); }
   };
 
@@ -335,7 +340,7 @@ const MenusManager = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Menus</h2>
-        <button onClick={handleCreateMenu} className="bg-blue-600 text-white px-4 py-2 rounded flex gap-2"><Plus size={18} /> New Menu</button>
+        <button onClick={() => setIsMenuModalOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded flex gap-2"><Plus size={18} /> New Menu</button>
       </div>
       <div className="grid gap-6">
         {menus.map(menu => (
@@ -374,6 +379,25 @@ const MenusManager = () => {
           </div>
         ))}
       </div>
+
+      {/* Create Menu Modal */}
+      {isMenuModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-bold mb-4">Create New Menu</h3>
+            <input
+              value={newMenuName}
+              onChange={(e) => setNewMenuName(e.target.value)}
+              placeholder="e.g. footer-menu"
+              className="w-full border p-2 rounded mb-4 focus:ring-2 focus:ring-blue-100 outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsMenuModalOpen(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
+              <button onClick={handleCreateMenu} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">Create</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -405,7 +429,9 @@ const SiteContentManager = () => {
       await updateContent({ key, value: editMap[key] || '', type });
       alert("Saved " + key);
       fetchContent();
-    } catch (e) { alert("Failed to save"); }
+    } catch (e) {
+      alert("Failed to save: " + (e.response?.data?.message || e.message));
+    }
   };
 
   const handleFileUpload = async (e, key) => {
@@ -473,6 +499,32 @@ const SiteContentManager = () => {
     </div>
   );
 
+  const renderToggle = (label, key) => (
+    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+      <label className="text-sm font-semibold text-gray-700">{label}</label>
+      <div className="flex items-center gap-3">
+        <div
+          onClick={() => {
+            const newVal = editMap[key] === 'true' ? 'false' : 'true';
+            setEditMap({ ...editMap, [key]: newVal });
+            // Auto-save on toggle for better UX, or wait for save button.
+            // Let's rely on manual save button for consistency with other fields
+          }}
+          className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${editMap[key] === 'true' ? 'bg-green-500' : 'bg-gray-300'}`}
+        >
+          <div className={`bg-white h-4 w-4 rounded-full shadow-md transform duration-300 ${editMap[key] === 'true' ? 'translate-x-6' : 'translate-x-0'}`} />
+        </div>
+        <button
+          onClick={() => handleSave(key, 'TEXT')}
+          className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          title="Save"
+        >
+          <Save size={16} />
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-8 pb-10">
       <div className="flex justify-between items-center">
@@ -493,12 +545,18 @@ const SiteContentManager = () => {
 
       {/* Top Navbar Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
-        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
-          <span className="text-purple-500">📏</span> Top Navbar
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {renderField('Announcement Text', 'top_bar_announcement', 'TEXT', 'e.g., Free Shipping on orders over $50!')}
-          {renderField('Contact Phone (Header)', 'contact_phone', 'TEXT')}
+        <div className="flex justify-between items-center border-b pb-2">
+          <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+            <span className="text-purple-500">📏</span> Top Navbar
+          </h3>
+        </div>
+
+        <div className="space-y-4">
+          {renderToggle('Show Top Navbar', 'show_top_navbar')}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {renderField('Announcement Text', 'top_bar_announcement', 'TEXT', 'e.g., Free Shipping on orders over $50!')}
+            {renderField('Contact Phone (Header)', 'contact_phone', 'TEXT')}
+          </div>
         </div>
       </div>
 
@@ -526,9 +584,11 @@ const SiteContentManager = () => {
           {renderField('Footer Description', 'footer_description', 'TEXT')}
           {renderField('Copyright Text', 'footer_copyright', 'TEXT')}
           {renderField('Contact Email', 'contact_email', 'TEXT')}
+          {renderField('Contact Address', 'contact_address', 'TEXT')}
           {renderField('Social Facebook URL', 'social_facebook', 'TEXT')}
           {renderField('Social Twitter URL', 'social_twitter', 'TEXT')}
           {renderField('Social Instagram URL', 'social_instagram', 'TEXT')}
+          {renderField('Social YouTube URL', 'social_youtube', 'TEXT')}
         </div>
       </div>
     </div>
@@ -539,6 +599,7 @@ const BlocklistManager = () => {
   const [blocked, setBlocked] = useState([]);
   const [newValue, setNewValue] = useState('');
   const [reason, setReason] = useState('');
+  const [blockType, setBlockType] = useState('EMAIL');
 
   const fetchBlocked = async () => {
     try { const res = await getAllBlocked(); setBlocked(res.data || res); } catch (e) { }
@@ -547,8 +608,8 @@ const BlocklistManager = () => {
 
   const handleBlock = async () => {
     if (!newValue) return;
-    try { await addToBlocklist({ type: 'email', value: newValue, reason }); fetchBlocked(); setNewValue(''); setReason(''); }
-    catch (e) { alert('Failed to block'); }
+    try { await addToBlocklist({ type: blockType, value: newValue, reason }); fetchBlocked(); setNewValue(''); setReason(''); }
+    catch (e) { alert('Failed to block: ' + (e.response?.data?.message || e.message)); }
   };
 
   const handleUnblock = async (id) => {
@@ -562,9 +623,17 @@ const BlocklistManager = () => {
 
       {/* Block Form */}
       <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-4 items-end">
+        <div className="w-32">
+          <label className="block text-xs font-bold text-red-800 mb-1">Type</label>
+          <select value={blockType} onChange={e => setBlockType(e.target.value)} className="w-full border p-2 rounded bg-white">
+            <option value="EMAIL">Email</option>
+            <option value="PHONE">Phone</option>
+            <option value="IP">IP Address</option>
+          </select>
+        </div>
         <div className="flex-1">
-          <label className="block text-xs font-bold text-red-800 mb-1">Email / IP to Block</label>
-          <input value={newValue} onChange={e => setNewValue(e.target.value)} className="w-full border p-2 rounded" placeholder="spam@example.com" />
+          <label className="block text-xs font-bold text-red-800 mb-1">Value</label>
+          <input value={newValue} onChange={e => setNewValue(e.target.value)} className="w-full border p-2 rounded" placeholder={blockType === 'IP' ? "192.168.1.1" : blockType === 'PHONE' ? "+88017..." : "email@example.com"} />
         </div>
         <div className="flex-1">
           <label className="block text-xs font-bold text-red-800 mb-1">Reason</label>
@@ -592,7 +661,6 @@ const BlocklistManager = () => {
     </div>
   );
 };
-
 const SettingsManager = () => {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);

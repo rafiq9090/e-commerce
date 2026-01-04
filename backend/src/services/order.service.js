@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const PromotionService = require('./promotion.service');
 const ActivityLogService = require('./activityLog.service');
 const transporter = require('../config/mailer');
+const BlocklistService = require('./blocklist.service');
 
 class OrderService {
 
@@ -67,6 +68,12 @@ class OrderService {
       customerName = guestDetails.name;
       customerPhone = guestDetails.phone;
       customerEmail = guestDetails.email || null;
+    }
+
+    // --- Blocklist Check ---
+    const isBlocked = await BlocklistService.isBlocked(ipAddress, customerPhone, customerEmail);
+    if (isBlocked) {
+      throw new ApiError(403, 'You fake cutomer please contact cutomer support');
     }
 
     // --- 3. Promotion Validation ---

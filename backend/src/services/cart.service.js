@@ -222,6 +222,7 @@ class CartService {
     await prisma.cartItem.delete({ where: { id: idAsInt } });
 
     // Return the correct cart
+    // Return the correct cart
     if (userId) {
       return this.getOrCreateCartByUserId(userId);
     } else {
@@ -230,6 +231,33 @@ class CartService {
         include: cartInclude, // 2. Use the reusable include
       });
     }
+  }
+
+  static async clearCart({ userId, cartId }) {
+    let cart = null;
+    if (userId) {
+      cart = await prisma.cart.findUnique({ where: { userId } });
+    } else if (cartId) {
+      cart = await prisma.cart.findUnique({ where: { id: cartId } });
+    }
+
+    if (!cart) {
+      // If no cart exists, nothing to clear.
+      // We can return null or an empty structure, or create a new one.
+      // Let's create an empty one to return consistent structure.
+      const newCart = await this.getOrCreateCartByOwner({ userId, guestCartId: cartId });
+      return newCart.cart;
+    }
+
+    // Delete all items
+    await prisma.cartItem.deleteMany({
+      where: { cartId: cart.id }
+    });
+
+    return prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: cartInclude
+    });
   }
 }
 

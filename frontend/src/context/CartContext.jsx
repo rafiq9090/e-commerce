@@ -12,34 +12,31 @@ export const CartProvider = ({ children }) => {
   const { isAuthenticated } = useAuth();
 
   const fetchCart = useCallback(async (retryCount = 0) => {
-    if (!isAuthenticated) {
-      setCart(null);
-      setLoading(false);
-      return;
-    }
+    // ALLOW GUESTS: Removed strict isAuthenticated check
+    // if (!isAuthenticated) { ... }
 
     setLoading(true);
     try {
-      const response = await getCart(); 
+      const response = await getCart();
       setCart(response.data);
     } catch (error) {
       console.error("Failed to fetch cart:", error.message);
-      
+
       if (retryCount < 2) {
         console.log(`Retrying cart fetch... (${retryCount + 1}/2)`);
         setTimeout(() => fetchCart(retryCount + 1), 1000);
         return;
       }
-      
+
       setCart(null);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, []); // Removed isAuthenticated dependency
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadCart = async () => {
       if (isMounted) {
         await fetchCart();
@@ -53,6 +50,7 @@ export const CartProvider = ({ children }) => {
     };
   }, [fetchCart]);
 
+  // Re-fetch when auth state changes (login/logout)
   useEffect(() => {
     fetchCart();
   }, [isAuthenticated, fetchCart]);
@@ -65,12 +63,12 @@ export const CartProvider = ({ children }) => {
 
   const handleAddToCart = async (productId, quantity) => {
     setOperationLoading(true);
-    
+
     const previousCart = optimisticUpdate(currentCart => {
       if (!currentCart) return currentCart;
-      
+
       const existingItem = currentCart.items.find(item => item.productId === productId);
-      
+
       if (existingItem) {
         return {
           ...currentCart,
@@ -88,7 +86,7 @@ export const CartProvider = ({ children }) => {
           product: { id: productId, name: 'Loading...' },
           createdAt: new Date().toISOString()
         };
-        
+
         return {
           ...currentCart,
           items: [...currentCart.items, tempItem]
@@ -110,7 +108,7 @@ export const CartProvider = ({ children }) => {
 
   const handleRemoveFromCart = async (cartItemId) => {
     setOperationLoading(true);
-    
+
     const previousCart = optimisticUpdate(currentCart => {
       if (!currentCart) return currentCart;
       return {
@@ -137,7 +135,7 @@ export const CartProvider = ({ children }) => {
     }
 
     setOperationLoading(true);
-    
+
     const previousCart = optimisticUpdate(currentCart => {
       if (!currentCart) return currentCart;
       return {
@@ -162,44 +160,25 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // ✅ FIXED: Proper clearCart implementation
+  // ✅ FIXED: clearCart uses the new API endpoint
   const clearCart = async () => {
-    if (!isAuthenticated || !cart || cart.items.length === 0) {
-      // If no cart or empty, just reset state
-      setCart(null);
-      return { success: true, message: 'Cart already empty' };
-    }
+    // If we have no items solely on frontend, we can just clear state, but best to sync with backend.
 
     setOperationLoading(true);
-    
     const previousCart = cart;
-    
+
     try {
-      try {
-        await clearCartApi();
-        console.log('Cart cleared successfully via API');
-      } catch (apiError) {
-        console.log('Clear cart API not available, using fallback method:', apiError.message);
-        
-        const removePromises = cart.items.map(item => 
-          removeCartItem(item.id).catch(err => {
-            console.warn(`Failed to remove item ${item.id}:`, err.message);
-            return null;
-          })
-        );
-        
-        await Promise.all(removePromises);
-        console.log('Cart cleared using fallback method');
-      }
-      
-      await fetchCart();
-      
-      return { success: true, message: 'Cart cleared successfully' };
-      
+      // Call the new API endpoint
+      const response = await clearCartApi();
+      console.log('Cart cleared successfully via API');
+      setCart(response.data); // Should be empty cart
+      return { success: true };
     } catch (error) {
       console.error('Failed to clear cart:', error);
-      setCart(previousCart);
-      throw error;
+      // Even if API fails (e.g. 404), likely cart is gone.
+      setCart(null);
+      // Do NOT restore previous cart on clear failure to avoid "Ghost Cart" issue user reported
+      return { success: false, error };
     } finally {
       setOperationLoading(false);
     }
@@ -212,7 +191,7 @@ export const CartProvider = ({ children }) => {
 
   const cartItems = cart ? cart.items : [];
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-  
+
   const totalPrice = cartItems.reduce((total, item) => {
     const price = parseFloat(item.product.sale_price || item.product.regular_price);
     return total + (price * item.quantity);
@@ -230,7 +209,7 @@ export const CartProvider = ({ children }) => {
     removeFromCart: handleRemoveFromCart,
     updateQuantity: handleUpdateQuantity,
     clearCart,
-    clearCartImmediate, 
+    clearCartImmediate,
     isEmpty: cartItems.length === 0
   };
 
