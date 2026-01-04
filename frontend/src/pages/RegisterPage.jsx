@@ -22,9 +22,12 @@ const RegisterPage = () => {
     try {
       // 3. Send data in the new format
       const response = await registerUser(email, password, profile);
-      
-      login(response.data.user, response.data.accessToken); 
-      navigate('/'); 
+
+      // registerUser returns { user, token }
+      const { user, token } = response;
+
+      login(user, token);
+      navigate('/');
     } catch (err) {
       setError(err.message || "Failed to register. Please try again.");
     }

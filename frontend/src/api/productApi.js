@@ -13,9 +13,9 @@ export const getProducts = async (filters = {}) => {
 
 export const getProductBySlug = async (slug) => {
   try {
-    
+
     const response = await apiClient.get(`/products/slug/${slug}`);
-    
+
     return response.data;
   } catch (error) {
     throw error;
@@ -26,7 +26,7 @@ export const getProductBySlug = async (slug) => {
 export const searchProducts = async (query, filters = {}) => {
   try {
     console.log('🔍 Frontend: Searching for:', query);
-    
+
     // ✅ Use only one parameter to avoid confusion
     const params = {
       q: query, // Use only 'q' parameter
@@ -35,8 +35,8 @@ export const searchProducts = async (query, filters = {}) => {
 
     console.log('🔍 API Request params:', params);
 
-    const response = await apiClient.get('/products/search', { 
-      params 
+    const response = await apiClient.get('/products/search', {
+      params
     });
 
     console.log('🔍 API Success - Products found:', response.data.data?.length || 0);
@@ -47,7 +47,7 @@ export const searchProducts = async (query, filters = {}) => {
     console.error("❌ Status:", error.response?.status);
     console.error("❌ Response:", error.response?.data);
     console.error("❌ Message:", error.response?.data?.message);
-    
+
     throw error;
   }
 };
@@ -103,6 +103,26 @@ export const deleteProduct = async (productId) => {
     return response.data;
   } catch (error) {
     console.error("Error deleting product:", error);
+    throw error;
+  }
+};
+
+export const getCategories = async () => {
+  try {
+    const response = await apiClient.get('/categories');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    throw error;
+  }
+};
+
+export const getSuppliers = async () => {
+  try {
+    const response = await apiClient.get('/suppliers');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching suppliers:", error);
     throw error;
   }
 };

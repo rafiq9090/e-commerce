@@ -25,17 +25,17 @@ const authenticate = asyncHandler(async (req, res, next) => {
 const sofAuthenticate = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer
-    if (token) {
-        try{
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = decoded; // Attach decoded payload (e.g., { id, email, role })
-        }catch(err){
-            req.user = null;
-        }
-    } else {
-        req.user = null;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = decoded; // Attach decoded payload (e.g., { id, email, role })
+    } catch (err) {
+      req.user = null;
     }
-    next();
+  } else {
+    req.user = null;
+  }
+  next();
 });
 
 
@@ -54,7 +54,7 @@ const authorize = (permission) => {
       include: { role: true }, // Include the role to access the permissions JSON
     });
 
-    if (!adminUser || !adminUser.role.permissions[permission]) {
+    if (!adminUser || !adminUser.role || !adminUser.role.permissions || !adminUser.role.permissions[permission]) {
       throw new ApiError(403, 'Forbidden: You do not have permission to perform this action.');
     }
 

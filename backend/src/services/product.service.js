@@ -6,16 +6,26 @@ const ActivityLogService = require('./activityLog.service');
 class ProductService {
   static async createProduct(productData) {
     const { inventory, ...data } = productData;
-    const { name, description, short_description, regular_price, sale_price, categoryId, supplierId, status, seoTitle, seoDescription, seoKeywords } = data;
-    
-    // ✅ Better slug generation with uniqueness check
+    const { name, description, short_description, regular_price, sale_price, categoryId, supplierId, status, seoTitle, seoDescription, seoKeywords, isFeatured } = data;
+
+    // Better slug generation with uniqueness check
     let slug = name.toLowerCase().split(' ').join('-');
     const existingProduct = await prisma.product.findUnique({
       where: { slug }
     });
-    
+
     if (existingProduct) {
       slug = `${slug}-${Date.now()}`;
+    }
+
+    // Prepare inventory data efficiently
+    // If inventory is passed as a number (quantity), normalize it to object
+    // If it's undefined, default to 0
+    let inventoryData = { quantity: 0 };
+    if (typeof inventory === 'number') {
+      inventoryData = { quantity: inventory };
+    } else if (typeof inventory === 'object' && inventory !== null) {
+      inventoryData = inventory; // Assume it's already { quantity: 50, sku: '...' }
     }
 
     return await prisma.product.create({
@@ -29,30 +39,31 @@ class ProductService {
         status,
         categoryId,
         supplierId,
+        isFeatured,
         seoTitle,
         seoDescription,
         seoKeywords,
         inventory: {
-          create: inventory || { quantity: 0 } // ✅ Default inventory
+          create: inventoryData
         },
       },
-      include: { 
+      include: {
         inventory: true,
         category: true,
         supplier: true,
-        images: true 
+        images: true
       },
     });
   }
 
   static async addImagesToProduct(productId, imageData) {
     const { path, altText, isFeatured } = imageData;
-    
+
     // ✅ Check if product exists first
     const product = await prisma.product.findUnique({
       where: { id: productId }
     });
-    
+
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
@@ -68,22 +79,22 @@ class ProductService {
   }
 
   static async getAllProducts(queryParams = {}) {
-    const { 
-      category, 
+    const {
+      category,
       status = 'PUBLISHED', // ✅ Default to published products
-      sortBy = 'createdAt', 
-      order = 'desc', 
-      page = 1, 
+      sortBy = 'createdAt',
+      order = 'desc',
+      page = 1,
       limit = 10,
-      featured 
+      featured
     } = queryParams;
 
     const where = { status };
-    
+
     if (category) {
       where.category = { name: category };
     }
-    
+
     if (featured !== undefined) {
       where.isFeatured = featured === 'true';
     }
@@ -117,57 +128,57 @@ class ProductService {
     };
   }
 
- static async getProductBySlug(slug) {
-  console.log('🔍 Service: Finding product by slug:', slug);
-  
-  try {
-    const product = await prisma.product.findUnique({
-      where: { slug },
-      include: {
-        category: true,
-        supplier: true,
-        inventory: true,
-        images: true,
-        reviews: { 
-          include: { 
-            user: { 
-              include: { profile: true } 
-            } 
-          }
-        },
-      },
-    });
+  static async getProductBySlug(slug) {
+    console.log('🔍 Service: Finding product by slug:', slug);
 
-    console.log('✅ Service: Query executed, product:', product ? 'found' : 'not found');
-    
-    if (!product) {
-      console.log('❌ Service: No product found with slug:', slug);
-      throw new ApiError(404, 'Product not found');
+    try {
+      const product = await prisma.product.findUnique({
+        where: { slug },
+        include: {
+          category: true,
+          supplier: true,
+          inventory: true,
+          images: true,
+          reviews: {
+            include: {
+              user: {
+                include: { profile: true }
+              }
+            }
+          },
+        },
+      });
+
+      console.log('✅ Service: Query executed, product:', product ? 'found' : 'not found');
+
+      if (!product) {
+        console.log('❌ Service: No product found with slug:', slug);
+        throw new ApiError(404, 'Product not found');
+      }
+
+      return product;
+    } catch (error) {
+      console.error('❌ Service Error in getProductBySlug:', error);
+      console.error('❌ Service Error message:', error.message);
+      throw error;
     }
-    
-    return product;
-  } catch (error) {
-    console.error('❌ Service Error in getProductBySlug:', error);
-    console.error('❌ Service Error message:', error.message);
-    throw error;
   }
-}
 
   static async updateProduct(productId, productData, adminId) {
     const { inventory, ...data } = productData;
     const { isFeatured, name, description, short_description, regular_price, sale_price, status, categoryId, supplierId, seoTitle, seoDescription, seoKeywords } = data;
-    
+
     let slug;
     if (name) {
       slug = name.toLowerCase().split(' ').join('-');
       // ✅ Check for slug uniqueness (excluding current product)
       const existingProduct = await prisma.product.findFirst({
-        where: { 
+        where: {
           slug,
           NOT: { id: productId }
         }
       });
-      
+
       if (existingProduct) {
         slug = `${slug}-${Date.now()}`;
       }
@@ -190,21 +201,28 @@ class ProductService {
       seoKeywords,
     };
 
-    // ✅ Only include inventory if provided
-    if (inventory) {
+    // Only include inventory if provided
+    if (inventory !== undefined && inventory !== null) {
+      let inventoryData = {};
+      if (typeof inventory === 'number') {
+        inventoryData = { quantity: inventory };
+      } else if (typeof inventory === 'object') {
+        inventoryData = inventory; // e.g. { quantity: 50, sku: 'ABC' }
+      }
+
       updateData.inventory = {
-        update: inventory
+        update: inventoryData
       };
     }
 
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
       data: updateData,
-      include: { 
+      include: {
         inventory: true,
         category: true,
         supplier: true,
-        images: true 
+        images: true
       },
     });
 
@@ -213,8 +231,8 @@ class ProductService {
       actorType: 'Admin',
       actorId: adminId,
       action: 'PRODUCT_UPDATED',
-      details: { 
-        productId: productId, 
+      details: {
+        productId: productId,
         productName: updatedProduct.name,
         changes: Object.keys(productData)
       }
@@ -242,93 +260,93 @@ class ProductService {
       actorType: 'Admin',
       actorId: adminId,
       action: 'PRODUCT_DELETED',
-      details: { 
-        productId: productId, 
-        productName: deletedProduct.name 
+      details: {
+        productId: productId,
+        productName: deletedProduct.name
       }
     });
 
     return deletedProduct;
   }
 
-// services/product.service.js - CORRECTED VERSION
-// services/product.service.js - FINAL WORKING VERSION
-// services/product.service.js - MINIMAL SAFE VERSION
-static async searchProducts(searchTerm, filters = {}) {
-  try {
-    console.log('🔍 Service: Searching for:', searchTerm);
-    
-    if (!searchTerm || searchTerm.trim() === '') {
-      return [];
+  // services/product.service.js - CORRECTED VERSION
+  // services/product.service.js - FINAL WORKING VERSION
+  // services/product.service.js - MINIMAL SAFE VERSION
+  static async searchProducts(searchTerm, filters = {}) {
+    try {
+      console.log('🔍 Service: Searching for:', searchTerm);
+
+      if (!searchTerm || searchTerm.trim() === '') {
+        return [];
+      }
+
+      const cleanSearchTerm = searchTerm.trim();
+
+      const where = {
+        OR: [
+          { name: { contains: cleanSearchTerm } },
+          { description: { contains: cleanSearchTerm } },
+          { short_description: { contains: cleanSearchTerm } }
+        ],
+        status: 'PUBLISHED'
+      };
+
+      console.log(' Prisma where clause:', JSON.stringify(where, null, 2));
+
+      // MINIMAL & SAFE: Only essential fields
+      const products = await prisma.product.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          short_description: true,
+          regular_price: true,
+          sale_price: true,
+          status: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          },
+          supplier: {
+            select: {
+              id: true,
+              name: true
+
+            }
+          },
+          inventory: {
+            select: {
+              id: true,
+              quantity: true
+            }
+          },
+          images: {
+            select: {
+              id: true,
+              url: true
+
+            }
+          }
+        },
+        orderBy: {
+          name: 'asc'
+        },
+        take: 50
+      });
+
+      console.log('Found products:', products.length);
+      return products;
+
+    } catch (error) {
+      console.error('ProductService search error:', error);
+      throw new Error('Database search failed: ' + error.message);
     }
-
-    const cleanSearchTerm = searchTerm.trim();
-    
-    const where = {
-      OR: [
-        { name: { contains: cleanSearchTerm } },
-        { description: { contains: cleanSearchTerm } },
-        { short_description: { contains: cleanSearchTerm } }
-      ],
-      status: 'PUBLISHED'
-    };
-
-    console.log(' Prisma where clause:', JSON.stringify(where, null, 2));
-
-    // MINIMAL & SAFE: Only essential fields
-    const products = await prisma.product.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        short_description: true,
-        regular_price: true,
-        sale_price: true,
-        status: true,
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true
-          }
-        },
-        supplier: {
-          select: {
-            id: true,
-            name: true
-           
-          }
-        },
-        inventory: {
-          select: {
-            id: true,
-            quantity: true
-          }
-        },
-        images: {
-          select: {
-            id: true,
-            url: true
-            
-          }
-        }
-      },
-      orderBy: {
-        name: 'asc'
-      },
-      take: 50
-    });
-
-    console.log('Found products:', products.length);
-    return products;
-
-  } catch (error) {
-    console.error('ProductService search error:', error);
-    throw new Error('Database search failed: ' + error.message);
   }
-}
 
   static async getFeaturedProducts(limit = 10) {
     return await prisma.product.findMany({
