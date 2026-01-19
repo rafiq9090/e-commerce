@@ -10,7 +10,9 @@ class PromotionService {
   }
 
   static async getAllPromotions() {
-    return await prisma.promotion.findMany();
+    return await prisma.promotion.findMany({
+      include: { product: true }
+    });
   }
 
   static async updatePromotion(promoId, promoData) {

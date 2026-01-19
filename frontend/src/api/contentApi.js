@@ -22,3 +22,14 @@ export const updateContent = async (data) => {
         throw error;
     }
 };
+
+// Delete content key (Admin)
+export const deleteContent = async (key) => {
+    try {
+        const response = await apiClient.delete(`/content/${encodeURIComponent(key)}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error deleting site content:", error);
+        throw error;
+    }
+};

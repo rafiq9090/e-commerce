@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProductBySlug } from '../api/productApi';
-import { placeOrder } from '../api/orderApi';
+import { getProductBySlug } from '../../api/productApi';
+import { placeOrder } from '../../api/orderApi';
 import { ShoppingCart, Check, Star, ShieldCheck, Truck, Clock, Menu, X, ChevronDown, Award, Heart, ThumbsUp, CreditCard, Banknote } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import { useCart } from '../../context/CartContext';
 
 const ProductLandingPage = () => {
     const { slug } = useParams();

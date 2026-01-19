@@ -8,6 +8,16 @@ class MenuService {
   static async createMenu(menuData) {
     const { items, ...rest } = menuData;
     const data = { ...rest };
+    if (data.name) {
+      const base = data.name.trim();
+      let nameToUse = base;
+      let suffix = 2;
+      while (await prisma.menu.findUnique({ where: { name: nameToUse } })) {
+        nameToUse = `${base}-${suffix}`;
+        suffix += 1;
+      }
+      data.name = nameToUse;
+    }
     if (items && Array.isArray(items) && items.length > 0) {
       data.items = { create: items };
     }

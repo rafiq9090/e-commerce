@@ -21,18 +21,22 @@ import {
   Users,
   AlertTriangle,
   ExternalLink,
-  Upload
+  Upload,
+  Mail,
+  Percent
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { getOrderStatistics, getAllOrders, updateOrderStatus } from '../api/orderApi';
-import { getProducts, createProduct, updateProduct, deleteProduct, getCategories as getProdCategories, getSuppliers as getProdSuppliers } from '../api/productApi';
-import { getCategories, createCategory, updateCategory, deleteCategory } from '../api/categoryApi';
-import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../api/supplierApi';
-import { getAllMenus, createMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '../api/menuApi';
-import { getAllContent, updateContent } from '../api/contentApi';
-import { getAllBlocked, addToBlocklist, removeFromBlocklist } from '../api/blocklistApi';
-import { registerAdmin, getRoles, getAdmins } from '../api/adminApi';
+import { getOrderStatistics, getAllOrders, updateOrderStatus } from '../../api/orderApi';
+import { getProducts, createProduct, updateProduct, deleteProduct, getCategories as getProdCategories, getSuppliers as getProdSuppliers } from '../../api/productApi';
+import { getCategories, createCategory, updateCategory, deleteCategory } from '../../api/categoryApi';
+import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../../api/supplierApi';
+import { getAllMenus, createMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '../../api/menuApi';
+import { getAllContent, updateContent, deleteContent } from '../../api/contentApi';
+import { getAllBlocked, addToBlocklist, removeFromBlocklist } from '../../api/blocklistApi';
+import { getNewsletterSubscribers, deleteNewsletterSubscriber, sendProductNewsletter, sendPromotionNewsletter } from '../../api/newsletterApi';
+import { getPromotions, createPromotion, deletePromotion } from '../../api/promotionApi';
+import { registerAdmin, getRoles, getAdmins } from '../../api/adminApi';
 
 const AdminDashboard = () => {
   const { logout, user } = useAuth();
@@ -91,11 +95,14 @@ const AdminDashboard = () => {
     switch (activeTab) {
       case 'overview': return <DashboardOverview />;
       case 'products': return <ProductsManager />;
+      case 'offers': return <PromotionsManager />;
       case 'orders': return <OrdersManager />;
       case 'categories': return <CategoriesManager />;
       case 'suppliers': return <SuppliersManager />;
       case 'menus': return <MenusManager />;
       case 'content': return <SiteContentManager />;
+      case 'mail': return <MailSettingsManager />;
+      case 'newsletter': return <NewsletterManager />;
       case 'blocklist': return <BlocklistManager />;
       case 'settings': return <SettingsManager />;
       case 'admins': return <AdminsManager />;
@@ -120,6 +127,7 @@ const AdminDashboard = () => {
             onClick={() => handleTabChange('products')}
             isOpen={isSidebarOpen}
           />
+          <SidebarItem icon={<Percent size={20} />} label="Offers" active={activeTab === 'offers'} onClick={() => handleTabChange('offers')} isOpen={isSidebarOpen} />
 
           <SidebarItem
             icon={<ShoppingCart size={20} />}
@@ -135,6 +143,8 @@ const AdminDashboard = () => {
           <SidebarItem icon={<Truck size={20} />} label="Suppliers" active={activeTab === 'suppliers'} onClick={() => handleTabChange('suppliers')} isOpen={isSidebarOpen} />
           <SidebarItem icon={<MenuIcon size={20} />} label="Menus" active={activeTab === 'menus'} onClick={() => handleTabChange('menus')} isOpen={isSidebarOpen} />
           <SidebarItem icon={<Type size={20} />} label="Site Content" active={activeTab === 'content'} onClick={() => handleTabChange('content')} isOpen={isSidebarOpen} />
+          <SidebarItem icon={<Mail size={20} />} label="Mail" active={activeTab === 'mail'} onClick={() => handleTabChange('mail')} isOpen={isSidebarOpen} />
+          <SidebarItem icon={<Mail size={20} />} label="Newsletter" active={activeTab === 'newsletter'} onClick={() => handleTabChange('newsletter')} isOpen={isSidebarOpen} />
           <SidebarItem icon={<ShieldAlert size={20} />} label="Blocklist" active={activeTab === 'blocklist'} onClick={() => handleTabChange('blocklist')} isOpen={isSidebarOpen} />
           {user?.role === 'SUPER_ADMIN' && (
             <SidebarItem icon={<Users size={20} />} label="Admins" active={activeTab === 'admins'} onClick={() => handleTabChange('admins')} isOpen={isSidebarOpen} />
@@ -320,7 +330,11 @@ const MenusManager = () => {
       setNewMenuName('');
     } catch (e) {
       console.error(e);
-      alert("Failed to create menu: " + (e.response?.data?.message || e.message));
+      const msg = e.response?.data?.message || e.message;
+      const friendly = msg && msg.toLowerCase().includes('unique')
+        ? 'Menu name already exists. Try a different name.'
+        : msg;
+      alert("Failed to create menu: " + friendly);
     }
   };
 
@@ -402,23 +416,32 @@ const MenusManager = () => {
   );
 };
 
-import { uploadFile } from '../api/uploadApi';
+import { uploadFile } from '../../api/uploadApi';
 
 const SiteContentManager = () => {
-  const [content, setContent] = useState([]);
   const [editMap, setEditMap] = useState({});
+  const [contentKeys, setContentKeys] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadingKey, setUploadingKey] = useState(null);
+  const [newKey, setNewKey] = useState('');
+  const [newKeySelection, setNewKeySelection] = useState('');
+  const [newValue, setNewValue] = useState('');
+  const [newType, setNewType] = useState('TEXT');
+  const [newUploadLoading, setNewUploadLoading] = useState(false);
 
   const fetchContent = async () => {
     setLoading(true);
     try {
       const res = await getAllContent();
       const data = res.data || res;
-      // Initialize edit map
       const initialMap = {};
-      data.forEach(c => initialMap[c.key] = c.value);
+      if (Array.isArray(data)) {
+        data.forEach(c => { initialMap[c.key] = c.value; });
+      } else if (data && typeof data === 'object') {
+        Object.entries(data).forEach(([key, value]) => { initialMap[key] = value; });
+      }
       setEditMap(initialMap);
+      setContentKeys(Object.keys(initialMap).sort());
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -450,12 +473,12 @@ const SiteContentManager = () => {
     }
   };
 
-  const renderField = (label, key, type = 'TEXT', placeholder = '') => (
+  const renderField = (label, key, type = 'TEXT', placeholder = '', isTextarea = false) => (
     <div className="flex flex-col space-y-2">
       <label className="text-sm font-semibold text-gray-700">{label}</label>
       <div className="flex gap-2 items-center">
         {type === 'TEXT' ? (
-          key.includes('description') || key.includes('text') && key.length > 20 ?
+          isTextarea || key.includes('description') || key.includes('text') && key.length > 20 ?
             <textarea
               value={editMap[key] || ''}
               onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
@@ -499,6 +522,49 @@ const SiteContentManager = () => {
     </div>
   );
 
+  const handleAddContent = async () => {
+    const keyToUse = newKeySelection === '__custom__' ? newKey.trim() : newKeySelection;
+    if (!keyToUse) {
+      alert('Key is required.');
+      return;
+    }
+    try {
+      await updateContent({ key: keyToUse, value: newValue || '', type: newType });
+      setNewKey('');
+      setNewKeySelection('');
+      setNewValue('');
+      setNewType('TEXT');
+      fetchContent();
+    } catch (e) {
+      alert("Failed to add content: " + (e.response?.data?.message || e.message));
+    }
+  };
+
+  const handleNewFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setNewUploadLoading(true);
+    try {
+      const res = await uploadFile(file);
+      const url = res.data.url;
+      setNewValue(url);
+    } catch (err) {
+      alert("Upload failed: " + (err.message || "Unknown error"));
+    } finally {
+      setNewUploadLoading(false);
+    }
+  };
+
+  const handleDeleteContent = async (key) => {
+    if (!window.confirm(`Delete content key "${key}"?`)) return;
+    try {
+      await deleteContent(key);
+      fetchContent();
+    } catch (e) {
+      alert("Failed to delete content: " + (e.response?.data?.message || e.message));
+    }
+  };
+
   const renderToggle = (label, key) => (
     <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
       <label className="text-sm font-semibold text-gray-700">{label}</label>
@@ -530,6 +596,81 @@ const SiteContentManager = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Site Content Management</h2>
         <button onClick={fetchContent} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium">Refresh</button>
+      </div>
+
+      {/* Add New Content Key */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-green-500">➕</span> Add Content Key
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Key</label>
+            <select
+              value={newKeySelection}
+              onChange={(e) => setNewKeySelection(e.target.value)}
+              className="border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+            >
+              <option value="">Select a key</option>
+              <option value="__custom__">Custom...</option>
+              {contentKeys.map((key) => (
+                <option key={key} value={key}>{key}</option>
+              ))}
+            </select>
+            {newKeySelection === '__custom__' && (
+              <input
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value)}
+                className="border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none font-mono text-sm"
+                placeholder="e.g. shipping_policy_body"
+              />
+            )}
+          </div>
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Type</label>
+            <select
+              value={newType}
+              onChange={(e) => setNewType(e.target.value)}
+              className="border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+            >
+              <option value="TEXT">TEXT</option>
+              <option value="IMAGE_URL">IMAGE_URL</option>
+            </select>
+          </div>
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Value</label>
+            {newType === 'IMAGE_URL' ? (
+              <div className="flex gap-2">
+                <input
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                  className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none font-mono text-sm"
+                  placeholder="https://example.com/image.png"
+                />
+                <label className={`cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded border flex items-center gap-2 text-xs font-bold ${newUploadLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {newUploadLoading ? '...' : <Upload size={14} />}
+                  <input type="file" className="hidden" accept="image/*" onChange={handleNewFileUpload} disabled={newUploadLoading} />
+                  Upload
+                </label>
+              </div>
+            ) : (
+              <input
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                className="border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+                placeholder="Initial value"
+              />
+            )}
+            {newType === 'IMAGE_URL' && newValue && (
+              <div className="mt-2 p-2 border rounded bg-gray-50 inline-block">
+                <img src={newValue} alt="Preview" className="h-16 object-contain" onError={(e) => e.target.style.display = 'none'} />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={handleAddContent} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Add</button>
+        </div>
       </div>
 
       {/* Branding Section */}
@@ -575,6 +716,56 @@ const SiteContentManager = () => {
         </div>
       </div>
 
+      {/* Pages Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-blue-500">📄</span> Pages
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderField('About Us Title', 'about_us_title', 'TEXT')}
+          {renderField("Today's Deals Title", 'todays_deals_title', 'TEXT')}
+          {renderField('Contact Us Title', 'contact_us_title', 'TEXT')}
+        </div>
+        <div className="grid grid-cols-1 gap-6">
+          {renderField('About Us Body', 'about_us_body', 'TEXT', 'Add about us...', true)}
+          {renderField("Today's Deals Body", 'todays_deals_body', 'TEXT', 'Add deals copy...', true)}
+          {renderField('Contact Us Body', 'contact_us_body', 'TEXT', 'Add contact intro...', true)}
+        </div>
+      </div>
+
+      {/* Legal Pages */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-indigo-500">📜</span> Legal Pages
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderField('Shipping Policy Title', 'shipping_policy_title', 'TEXT', '', false)}
+          {renderField('Return & Refund Title', 'return_refund_title', 'TEXT', '', false)}
+          {renderField('Privacy Policy Title', 'privacy_policy_title', 'TEXT', '', false)}
+          {renderField('Terms & Conditions Title', 'terms_conditions_title', 'TEXT', '', false)}
+        </div>
+        <div className="grid grid-cols-1 gap-6">
+          {renderField('Shipping Policy Body', 'shipping_policy_body', 'TEXT', 'Add shipping policy...', true)}
+          {renderField('Return & Refund Body', 'return_refund_body', 'TEXT', 'Add return & refund policy...', true)}
+          {renderField('Privacy Policy Body', 'privacy_policy_body', 'TEXT', 'Add privacy policy...', true)}
+          {renderField('Terms & Conditions Body', 'terms_conditions_body', 'TEXT', 'Add terms & conditions...', true)}
+        </div>
+      </div>
+
+      {/* Newsletter */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-emerald-500">✉️</span> Newsletter
+        </h3>
+        <div className="space-y-4">
+          {renderToggle('Show Newsletter Box', 'show_newsletter')}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {renderField('Newsletter Title', 'newsletter_title', 'TEXT')}
+            {renderField('Newsletter Description', 'newsletter_description', 'TEXT')}
+          </div>
+        </div>
+      </div>
+
       {/* Footer Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
         <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
@@ -590,6 +781,196 @@ const SiteContentManager = () => {
           {renderField('Social Instagram URL', 'social_instagram', 'TEXT')}
           {renderField('Social YouTube URL', 'social_youtube', 'TEXT')}
         </div>
+      </div>
+
+      {/* Content Keys */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-gray-800">
+          <span className="text-red-500">🗑️</span> Content Keys
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {contentKeys.length === 0 && (
+            <p className="text-gray-500 text-sm">No content keys found.</p>
+          )}
+          {contentKeys.map((key) => (
+            <div key={key} className="flex items-center justify-between border rounded-lg p-3">
+              <span className="font-mono text-xs text-gray-700">{key}</span>
+              <button
+                onClick={() => handleDeleteContent(key)}
+                className="text-red-600 hover:text-red-700 text-sm font-semibold"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NewsletterManager = () => {
+  const [subscribers, setSubscribers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSubscribers = async () => {
+    setLoading(true);
+    try {
+      const res = await getNewsletterSubscribers();
+      setSubscribers(res.data || res);
+    } catch (e) {
+      console.error('Failed to load subscribers', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchSubscribers(); }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Remove this subscriber?')) return;
+    try {
+      await deleteNewsletterSubscriber(id);
+      fetchSubscribers();
+    } catch (e) {
+      alert('Failed to delete subscriber');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Newsletter Subscribers</h2>
+        <button onClick={fetchSubscribers} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium">Refresh</button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="p-4">Email</th>
+              <th className="p-4">Subscribed At</th>
+              <th className="p-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {loading && (
+              <tr><td colSpan="3" className="p-6 text-center text-gray-500">Loading...</td></tr>
+            )}
+            {!loading && subscribers.length === 0 && (
+              <tr><td colSpan="3" className="p-6 text-center text-gray-500">No subscribers yet.</td></tr>
+            )}
+            {!loading && subscribers.map((s) => (
+              <tr key={s.id}>
+                <td className="p-4 font-mono text-sm">{s.email}</td>
+                <td className="p-4 text-sm text-gray-600">{new Date(s.createdAt).toLocaleString()}</td>
+                <td className="p-4 text-right">
+                  <button
+                    onClick={() => handleDelete(s.id)}
+                    className="text-red-600 hover:text-red-700 px-3 py-1 border rounded hover:border-red-600"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const MailSettingsManager = () => {
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchSettings = async () => {
+    setLoading(true);
+    try {
+      const res = await getAllContent();
+      const data = res.data || res;
+      const initialMap = {};
+      if (Array.isArray(data)) {
+        data.forEach(c => { initialMap[c.key] = c.value; });
+      } else if (data && typeof data === 'object') {
+        Object.entries(data).forEach(([key, value]) => { initialMap[key] = value; });
+      }
+      setSettings(initialMap);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+  useEffect(() => { fetchSettings(); }, []);
+
+  const handleSave = async (key, value) => {
+    try {
+      await updateContent({ key, value, type: 'TEXT' });
+      alert('Saved ' + key);
+      fetchSettings();
+    } catch (e) {
+      alert('Failed to save: ' + (e.response?.data?.message || e.message));
+    }
+  };
+
+  const handleSaveAll = async () => {
+    setSaving(true);
+    try {
+      const payload = [
+        { key: 'email_host', value: settings.email_host || '', type: 'TEXT' },
+        { key: 'email_port', value: settings.email_port || '', type: 'TEXT' },
+        { key: 'email_user', value: settings.email_user || '', type: 'TEXT' },
+        { key: 'email_pass', value: settings.email_pass || '', type: 'TEXT' },
+        { key: 'email_from', value: settings.email_from || '', type: 'TEXT' }
+      ];
+      await updateContent(payload);
+      alert('Mail settings saved');
+      fetchSettings();
+    } catch (e) {
+      alert('Failed to save: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderField = (label, key, type = 'text') => (
+    <div className="flex flex-col space-y-2">
+      <label className="text-sm font-semibold text-gray-700">{label}</label>
+      <input
+        type={type}
+        value={settings[key] || ''}
+        onChange={(e) => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
+        className="border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+        placeholder={label}
+      />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Mail Settings</h2>
+        <button onClick={fetchSettings} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium">Refresh</button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        {loading && <p className="text-gray-500 text-sm">Loading...</p>}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderField('SMTP Host', 'email_host')}
+          {renderField('SMTP Port', 'email_port')}
+          {renderField('SMTP User', 'email_user')}
+          {renderField('SMTP Password', 'email_pass', 'password')}
+          {renderField('From Email', 'email_from')}
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={handleSaveAll}
+            disabled={saving}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save All'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">Uses these values for newsletter email delivery. If empty, .env values are used.</p>
       </div>
     </div>
   );
@@ -669,9 +1050,12 @@ const SettingsManager = () => {
     try {
       const res = await getAllContent();
       const data = res.data || res;
-      // Filter for settings-related keys or just load all and pick
       const initialMap = {};
-      data.forEach(c => initialMap[c.key] = c.value);
+      if (Array.isArray(data)) {
+        data.forEach(c => { initialMap[c.key] = c.value; });
+      } else if (data && typeof data === 'object') {
+        Object.entries(data).forEach(([key, value]) => { initialMap[key] = value; });
+      }
       setSettings(initialMap);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -760,6 +1144,7 @@ const ProductsManager = () => {
     categoryId: '', supplierId: '', inventory: 0, images: [], status: 'DRAFT',
     seoTitle: '', seoDescription: '', seoKeywords: ''
   });
+  const [notifySubscribers, setNotifySubscribers] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -853,7 +1238,21 @@ const ProductsManager = () => {
         inventory: parseInt(formData.inventory),
         images: formattedImages
       };
-      if (editingProduct) { await updateProduct(editingProduct.id, payload); alert('Updated!'); } else { await createProduct(payload); alert('Created!'); }
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, payload);
+        alert('Updated!');
+      } else {
+        const res = await createProduct(payload);
+        const createdProduct = res.data || res;
+        if (notifySubscribers && createdProduct?.id) {
+          try {
+            await sendProductNewsletter(createdProduct.id);
+          } catch (e) {
+            alert('Product created, but email failed to send.');
+          }
+        }
+        alert('Created!');
+      }
       setIsModalOpen(false); fetchData(); resetForm();
     } catch (err) { alert('Failed: ' + (err.response?.data?.message || err.message)); }
   };
@@ -902,6 +1301,7 @@ const ProductsManager = () => {
       images: [], status: 'DRAFT',
       seoTitle: '', seoDescription: '', seoKeywords: ''
     });
+    setNotifySubscribers(false);
   };
 
   return (
@@ -921,9 +1321,6 @@ const ProductsManager = () => {
                 }`}
             >
               {status.charAt(0) + status.slice(1).toLowerCase()}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${filterStatus === status ? 'bg-gray-100 text-gray-800' : 'bg-gray-200 text-gray-600'}`}>
-                {productCounts[status] || 0}
-              </span>
             </button>
           ))}
         </div>
@@ -1077,6 +1474,16 @@ const ProductsManager = () => {
                   </div>
                 </div>
               </div>
+              {!editingProduct && (
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={notifySubscribers}
+                    onChange={(e) => setNotifySubscribers(e.target.checked)}
+                  />
+                  Send email to newsletter subscribers
+                </label>
+              )}
               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition-all transform hover:scale-[1.01]">Save Product</button>
             </form>
           </div>
@@ -1086,10 +1493,249 @@ const ProductsManager = () => {
   );
 };
 
+const PromotionsManager = () => {
+  const [promotions, setPromotions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notifySubscribers, setNotifySubscribers] = useState(false);
+  const [promoProducts, setPromoProducts] = useState([]);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [formData, setFormData] = useState({
+    code: '',
+    description: '',
+    type: 'PERCENTAGE',
+    value: '',
+    startDate: today,
+    endDate: '',
+    usageLimit: '',
+    isActive: true,
+    productId: ''
+  });
+
+  const fetchPromotions = async () => {
+    setLoading(true);
+    try {
+      const res = await getPromotions();
+      setPromotions(res.data || res || []);
+    } catch (e) {
+      console.error('Failed to load promotions', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPromoProducts = async () => {
+    try {
+      const res = await getProducts({ status: 'ALL', limit: 200 });
+      setPromoProducts(res.data?.products || res.products || []);
+    } catch (e) {
+      console.error('Failed to load products for offers', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchPromotions();
+    fetchPromoProducts();
+  }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...formData,
+        value: parseFloat(formData.value),
+        usageLimit: formData.usageLimit ? parseInt(formData.usageLimit, 10) : null,
+        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : new Date().toISOString(),
+        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : null,
+        productId: formData.productId || null
+      };
+      const res = await createPromotion(payload);
+      const created = res.data || res;
+      if (notifySubscribers && created?.id) {
+        try {
+          await sendPromotionNewsletter(created.id);
+        } catch (e) {
+          alert('Offer created, but email failed to send.');
+        }
+      }
+      setFormData({ code: '', description: '', type: 'PERCENTAGE', value: '', startDate: today, endDate: '', usageLimit: '', isActive: true, productId: '' });
+      setNotifySubscribers(false);
+      fetchPromotions();
+    } catch (e) {
+      alert('Failed to create offer: ' + (e.response?.data?.message || e.message));
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this offer?')) return;
+    try {
+      await deletePromotion(id);
+      fetchPromotions();
+    } catch (e) {
+      alert('Failed to delete offer');
+    }
+  };
+
+  const handleSend = async (id) => {
+    try {
+      await sendPromotionNewsletter(id);
+      alert('Offer email sent!');
+    } catch (e) {
+      alert('Failed to send offer email');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Offers</h2>
+        <button onClick={fetchPromotions} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium">Refresh</button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h3 className="text-lg font-bold">Create Offer</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="CODE"
+              className="border p-2 rounded"
+              required
+            />
+            <input
+              value={formData.value}
+              onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+              placeholder="Value"
+              type="number"
+              className="border p-2 rounded"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select
+              value={formData.productId}
+              onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
+              className="border p-2 rounded"
+            >
+              <option value="">All Products</option>
+              {promoProducts.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              className="border p-2 rounded"
+            >
+              <option value="PERCENTAGE">Percentage</option>
+              <option value="FIXED_AMOUNT">Fixed Amount</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Description"
+              className="border p-2 rounded h-24 md:col-span-2"
+            />
+            <input
+              value={formData.usageLimit}
+              onChange={(e) => setFormData({ ...formData, usageLimit: e.target.value })}
+              placeholder="Usage Limit"
+              type="number"
+              className="border p-2 rounded"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              className="border p-2 rounded"
+              required
+            />
+            <input
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              className="border p-2 rounded"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+            />
+            Active
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={notifySubscribers}
+              onChange={(e) => setNotifySubscribers(e.target.checked)}
+            />
+            Send email to newsletter subscribers
+          </label>
+          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">Create Offer</button>
+        </form>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b font-semibold">Offers List</div>
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="p-4">Code</th>
+                <th className="p-4">Product</th>
+                <th className="p-4">Value</th>
+                <th className="p-4">Active</th>
+                <th className="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {loading && (
+                <tr><td colSpan="4" className="p-6 text-center text-gray-500">Loading...</td></tr>
+              )}
+              {!loading && promotions.length === 0 && (
+                <tr><td colSpan="4" className="p-6 text-center text-gray-500">No offers yet.</td></tr>
+              )}
+              {!loading && promotions.map((p) => (
+                <tr key={p.id}>
+                  <td className="p-4 font-mono">{p.code}</td>
+                  <td className="p-4">{p.product?.name || 'All Products'}</td>
+                  <td className="p-4">{p.type === 'PERCENTAGE' ? `${p.value}%` : p.value}</td>
+                  <td className="p-4">{p.isActive ? 'Yes' : 'No'}</td>
+                  <td className="p-4 text-right flex justify-end gap-2">
+                    <button onClick={() => handleSend(p.id)} className="text-blue-600 hover:text-blue-700 px-3 py-1 border rounded">Email</button>
+                    <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-700 px-3 py-1 border rounded">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CategoriesManager = () => {
   const [categories, setCategories] = useState([]); const [isModalOpen, setIsModalOpen] = useState(false); const [formData, setFormData] = useState({ name: '', slug: '' }); const [editingId, setEditingId] = useState(null);
   const fetchCats = async () => { const res = await getCategories(); setCategories(res.data || res); }; useEffect(() => { fetchCats(); }, []);
-  const handleSubmit = async (e) => { e.preventDefault(); try { if (editingId) await updateCategory(editingId, formData); else await createCategory(formData); setIsModalOpen(false); fetchCats(); setFormData({ name: '', slug: '' }); setEditingId(null); } catch (e) { alert('Error'); } };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingId) await updateCategory(editingId, formData);
+      else await createCategory(formData);
+      setIsModalOpen(false);
+      fetchCats();
+      setFormData({ name: '', slug: '' });
+      setEditingId(null);
+    } catch (e) {
+      alert(e.response?.data?.message || e.message || 'Error');
+    }
+  };
   const handleDelete = async (id) => { if (!window.confirm('Delete?')) return; try { await deleteCategory(id); fetchCats(); } catch (e) { alert('Error'); } };
   return (
     <div className="space-y-6"><div className="flex justify-between items-center"><h2 className="text-2xl font-bold">Categories</h2><button onClick={() => { setEditingId(null); setFormData({ name: '', slug: '' }); setIsModalOpen(true); }} className="bg-blue-600 text-white px-4 py-2 rounded gap-2 flex"><Plus size={18} /> Add</button></div><div className="bg-white rounded-xl shadow-sm overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-50 border-b"><tr><th className="p-4">Name</th><th className="p-4">Slug</th><th className="p-4 text-right">Actions</th></tr></thead><tbody className="divide-y">{categories.map(c => (<tr key={c.id}><td className="p-4">{c.name}</td><td className="p-4">{c.slug}</td><td className="p-4 text-right"><button onClick={() => { setEditingId(c.id); setFormData({ name: c.name, slug: c.slug }); setIsModalOpen(true); }} className="p-2 text-blue-600"><Edit size={16} /></button><button onClick={() => handleDelete(c.id)} className="p-2 text-red-600"><Trash2 size={16} /></button></td></tr>))}</tbody></table></div>{isModalOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div className="bg-white rounded-xl p-6 w-full max-w-md"><h3 className="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Category</h3><form onSubmit={handleSubmit} className="space-y-4"><input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Name" className="w-full border p-2 rounded" required /><input value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value })} placeholder="Slug" className="w-full border p-2 rounded" required /><div className="flex gap-2 justify-end"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Save</button></div></form></div></div>)}</div>
@@ -1098,7 +1744,19 @@ const CategoriesManager = () => {
 const SuppliersManager = () => {
   const [suppliers, setSuppliers] = useState([]); const [isModalOpen, setIsModalOpen] = useState(false); const [formData, setFormData] = useState({ name: '', location: '', contactEmail: '' }); const [editingId, setEditingId] = useState(null);
   const fetchSups = async () => { const res = await getSuppliers(); setSuppliers(res.data || res); }; useEffect(() => { fetchSups(); }, []);
-  const handleSubmit = async (e) => { e.preventDefault(); try { if (editingId) await updateSupplier(editingId, formData); else await createSupplier(formData); setIsModalOpen(false); fetchSups(); setFormData({ name: '', location: '', contactEmail: '' }); setEditingId(null); } catch (e) { alert('Error'); } };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingId) await updateSupplier(editingId, formData);
+      else await createSupplier(formData);
+      setIsModalOpen(false);
+      fetchSups();
+      setFormData({ name: '', location: '', contactEmail: '' });
+      setEditingId(null);
+    } catch (e) {
+      alert(e.response?.data?.message || e.message || 'Error');
+    }
+  };
   const handleDelete = async (id) => { if (!window.confirm('Delete?')) return; try { await deleteSupplier(id); fetchSups(); } catch (e) { alert('Error'); } };
   return (
     <div className="space-y-6"><div className="flex justify-between items-center"><h2 className="text-2xl font-bold">Suppliers</h2><button onClick={() => { setEditingId(null); setFormData({ name: '', location: '', contactEmail: '' }); setIsModalOpen(true); }} className="bg-blue-600 text-white px-4 py-2 rounded gap-2 flex"><Plus size={18} /> Add</button></div><div className="bg-white rounded-xl shadow-sm overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-50 border-b"><tr><th className="p-4">Name</th><th className="p-4">Location</th><th className="p-4">Email</th><th className="p-4 text-right">Actions</th></tr></thead><tbody className="divide-y">{suppliers.map(s => (<tr key={s.id}><td className="p-4">{s.name}</td><td className="p-4">{s.location}</td><td className="p-4">{s.contactEmail}</td><td className="p-4 text-right"><button onClick={() => { setEditingId(s.id); setFormData({ name: s.name, location: s.location, contactEmail: s.contactEmail }); setIsModalOpen(true); }} className="p-2 text-blue-600"><Edit size={16} /></button><button onClick={() => handleDelete(s.id)} className="p-2 text-red-600"><Trash2 size={16} /></button></td></tr>))}</tbody></table></div>{isModalOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div className="bg-white rounded-xl p-6 w-full max-w-md"><h3 className="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Supplier</h3><form onSubmit={handleSubmit} className="space-y-4"><input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Name" className="w-full border p-2 rounded" required /><input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} placeholder="Location" className="w-full border p-2 rounded" required /><input value={formData.contactEmail} onChange={e => setFormData({ ...formData, contactEmail: e.target.value })} placeholder="Email" className="w-full border p-2 rounded" required /><div className="flex gap-2 justify-end"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Save</button></div></form></div></div>)}</div>

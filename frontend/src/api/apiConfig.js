@@ -25,6 +25,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn("Token expired or unauthorized — clearing localStorage");
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
      
     }
     return Promise.reject(error);

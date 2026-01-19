@@ -14,6 +14,7 @@ async function updatePermissions() {
         can_manage_menus: true,
         can_manage_site_content: true,
         can_manage_blocklist: true,
+        can_manage_promotions: true,
     };
 
     try {

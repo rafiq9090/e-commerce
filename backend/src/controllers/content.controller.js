@@ -13,7 +13,14 @@ const updateContent = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, updatedContent, 'Content updated successfully'));
 });
 
+const deleteContent = asyncHandler(async (req, res) => {
+  const { key } = req.params;
+  const result = await ContentService.deleteContent(key);
+  res.status(200).json(new ApiResponse(200, result, 'Content deleted successfully'));
+});
+
 module.exports = { 
   getAllContent, 
-  updateContent 
+  updateContent,
+  deleteContent
 };

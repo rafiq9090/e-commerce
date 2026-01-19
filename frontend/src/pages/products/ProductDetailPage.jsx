@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { getProductBySlug, getRelatedProducts } from "../api/productApi";
-import { useCart } from "../context/CartContext";
-import { useAuth } from "../context/AuthContext";
+import { getProductBySlug, getRelatedProducts } from "../../api/productApi";
+import { useCart } from "../../context/CartContext";
+import { useAuth } from "../../context/AuthContext";
 import {
   ShoppingCart,
   Truck,

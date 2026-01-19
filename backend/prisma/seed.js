@@ -27,6 +27,7 @@ async function main() {
   await deleteTable('supplier');
   await deleteTable('adminUser');
   await deleteTable('adminRole');
+  await deleteTable('siteContent');
 
   console.log('Creating Admin Roles & Permissions...');
 
@@ -42,6 +43,7 @@ async function main() {
     can_manage_menus: true,
     can_manage_site_content: true,
     can_manage_blocklist: true,
+    can_manage_promotions: true,
   };
 
   const productPermissions = {
@@ -79,6 +81,35 @@ async function main() {
   const hashedPw = await bcrypt.hash('admin123', 10);
   await prisma.adminUser.create({
     data: { name: 'Super Admin', email: 'admin@example.com', password: hashedPw, roleId: superAdminRole.id }
+  });
+
+  console.log('Creating Demo Site Content...');
+  await prisma.siteContent.createMany({
+    data: [
+      { key: 'shipping_policy_title', value: 'Shipping Policy', type: 'TEXT' },
+      { key: 'shipping_policy_body', value: 'We process orders within 1-2 business days.\n\nStandard delivery takes 2-5 business days depending on your location. Express options may be available at checkout.\n\nShipping fees are calculated at checkout based on weight, destination, and service level.\n\nYou will receive a tracking number by email once your order ships.', type: 'TEXT' },
+      { key: 'return_refund_title', value: 'Return & Refund Policy', type: 'TEXT' },
+      { key: 'return_refund_body', value: 'We accept returns within 7 days of delivery for unused items in original packaging.\n\nTo request a return, contact support with your order number and reason for return.\n\nRefunds are issued to the original payment method within 5-10 business days after inspection.\n\nShipping fees are non-refundable unless the item arrived damaged or incorrect.', type: 'TEXT' },
+      { key: 'privacy_policy_title', value: 'Privacy Policy', type: 'TEXT' },
+      { key: 'privacy_policy_body', value: 'We respect your privacy and only collect information needed to process your orders and improve your shopping experience.\n\nWe never sell your personal data to third parties.\n\nWe use cookies to remember your preferences and optimize site performance.\n\nYou can request access to or deletion of your data by contacting support.', type: 'TEXT' },
+      { key: 'terms_conditions_title', value: 'Terms & Conditions', type: 'TEXT' },
+      { key: 'terms_conditions_body', value: 'By using this site, you agree to our terms and conditions.\n\nPrices and availability are subject to change without notice.\n\nWe reserve the right to cancel orders for suspected fraud or misuse.\n\nAny disputes will be handled according to local laws and regulations.', type: 'TEXT' },
+      { key: 'about_us_title', value: 'About Us', type: 'TEXT' },
+      { key: 'about_us_body', value: 'DeshShera is built for shoppers who want quality and value. We curate products from trusted suppliers and deliver fast across Bangladesh.\n\nOur mission is to make everyday shopping effortless with transparent pricing, reliable delivery, and friendly support.', type: 'TEXT' },
+      { key: 'todays_deals_title', value: "Today's Deals", type: 'TEXT' },
+      { key: 'todays_deals_body', value: 'Discover limited-time discounts across electronics, fashion, and home essentials.\n\nCheck back daily for new deals and flash sales curated just for you.', type: 'TEXT' },
+      { key: 'contact_us_title', value: 'Contact Us', type: 'TEXT' },
+      { key: 'contact_us_body', value: 'Have a question or need help with an order? Reach out anytime and our support team will respond within 24 hours.', type: 'TEXT' },
+      { key: 'newsletter_title', value: 'Subscribe to Our Newsletter', type: 'TEXT' },
+      { key: 'newsletter_description', value: 'Get the latest updates on new products and upcoming sales.', type: 'TEXT' },
+      { key: 'newsletter_from_email', value: 'no-reply@deshshera.com', type: 'TEXT' },
+      { key: 'show_newsletter', value: 'true', type: 'TEXT' },
+      { key: 'email_host', value: 'smtp.gmail.com', type: 'TEXT' },
+      { key: 'email_port', value: '587', type: 'TEXT' },
+      { key: 'email_user', value: 'your@gmail.com', type: 'TEXT' },
+      { key: 'email_pass', value: 'your_app_password', type: 'TEXT' },
+      { key: 'email_from', value: 'your@gmail.com', type: 'TEXT' }
+    ]
   });
 
   const supplier = await prisma.supplier.create({

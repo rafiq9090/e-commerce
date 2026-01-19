@@ -35,6 +35,15 @@ class ContentService {
 
     return await prisma.$transaction(transactions);
   }
+
+  /**
+   * Deletes a content item by key.
+   * @param {string} key
+   */
+  static async deleteContent(key) {
+    const result = await prisma.siteContent.deleteMany({ where: { key } });
+    return result;
+  }
 }
 
 module.exports = ContentService;

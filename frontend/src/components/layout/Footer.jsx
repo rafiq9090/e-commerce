@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getAllContent } from '../../api/contentApi';
+import { subscribeNewsletter } from '../../api/newsletterApi';
 import {
   Facebook,
   Instagram,
@@ -20,6 +21,9 @@ import {
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const [siteContent, setSiteContent] = useState({});
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterStatus, setNewsletterStatus] = useState('');
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -41,6 +45,25 @@ const Footer = () => {
     };
     fetchContent();
   }, []);
+
+  const handleNewsletterSubmit = async (e) => {
+    e.preventDefault();
+    setNewsletterStatus('');
+    if (!newsletterEmail.trim()) {
+      setNewsletterStatus('Please enter a valid email.');
+      return;
+    }
+    try {
+      setNewsletterLoading(true);
+      await subscribeNewsletter(newsletterEmail.trim());
+      setNewsletterStatus('Thanks for subscribing!');
+      setNewsletterEmail('');
+    } catch (error) {
+      setNewsletterStatus(error?.response?.data?.message || 'Subscription failed. Try again.');
+    } finally {
+      setNewsletterLoading(false);
+    }
+  };
 
   return (
     <footer className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-300">
@@ -140,21 +163,9 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/blog" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2 group">
-                  <span className="w-0 group-hover:w-2 h-0.5 bg-blue-400 transition-all duration-300"></span>
-                  Blog
-                </Link>
-              </li>
-              <li>
                 <Link to="/contact" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2 group">
                   <span className="w-0 group-hover:w-2 h-0.5 bg-blue-400 transition-all duration-300"></span>
                   Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link to="/faq" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2 group">
-                  <span className="w-0 group-hover:w-2 h-0.5 bg-blue-400 transition-all duration-300"></span>
-                  FAQ
                 </Link>
               </li>
             </ul>
@@ -286,27 +297,35 @@ const Footer = () => {
       </div>
 
       {/* Newsletter Section */}
-      <div className="border-t border-gray-800 bg-gray-900/50">
-        <div className="container mx-auto px-6 py-12">
-          <div className="max-w-2xl mx-auto text-center">
-            <h3 className="text-2xl font-bold text-white mb-3">Subscribe to Our Newsletter</h3>
-            <p className="text-gray-400 mb-6">Get the latest updates on new products and upcoming sales</p>
-            <form className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="email"
-                placeholder="Enter your email address"
-                className="flex-1 px-6 py-3 bg-gray-800 border border-gray-700 rounded-full text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
-              />
-              <button
-                type="submit"
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-8 py-3 rounded-full hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/50"
-              >
-                Subscribe
-              </button>
-            </form>
+      {siteContent.show_newsletter !== 'false' && (
+        <div className="border-t border-gray-800 bg-gray-900/50">
+          <div className="container mx-auto px-6 py-12">
+            <div className="max-w-2xl mx-auto text-center">
+              <h3 className="text-2xl font-bold text-white mb-3">{siteContent.newsletter_title || 'Subscribe to Our Newsletter'}</h3>
+              <p className="text-gray-400 mb-6">{siteContent.newsletter_description || 'Get the latest updates on new products and upcoming sales'}</p>
+              <form className="flex flex-col sm:flex-row gap-3" onSubmit={handleNewsletterSubmit}>
+                <input
+                  type="email"
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  className="flex-1 px-6 py-3 bg-gray-800 border border-gray-700 rounded-full text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
+                />
+                <button
+                  type="submit"
+                  disabled={newsletterLoading}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-8 py-3 rounded-full hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {newsletterLoading ? 'Subscribing...' : 'Subscribe'}
+                </button>
+              </form>
+              {newsletterStatus && (
+                <p className="text-sm text-gray-400 mt-4">{newsletterStatus}</p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Bottom Bar */}
       <div className="border-t border-gray-800">

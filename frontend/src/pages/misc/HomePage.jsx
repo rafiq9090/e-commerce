@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getProducts } from '../api/productApi';
-import ProductCard from '../components/product/ProductCard';
-import Hero from '../components/layout/Hero';
+import { getProducts } from '../../api/productApi';
+import ProductCard from '../../components/product/ProductCard';
+import Hero from '../../components/layout/Hero';
 
 const HomePage = () => {
   const [products, setProducts] = useState([]);

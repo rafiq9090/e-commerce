@@ -153,6 +153,7 @@ model Product {
   // --- NEW: Related Products Relation ---
   relatedProducts Product[] @relation("RelatedProducts")
   relatedTo       Product[] @relation("RelatedProducts")
+  promotions     Promotion[]
 
   @@fulltext([name, description])
 }
@@ -295,6 +296,8 @@ model Promotion {
   endDate     DateTime?
   usageLimit  Int?
   isActive    Boolean       @default(true)
+  productId   String?
+  product     Product?      @relation(fields: [productId], references: [id])
 }
 
 // -------------------
@@ -307,6 +310,12 @@ model SiteContent {
   type      ContentType
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+}
+
+model NewsletterSubscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now())
 }
 
 model Menu {

@@ -54,6 +54,18 @@ const authorize = (permission) => {
       include: { role: true }, // Include the role to access the permissions JSON
     });
 
+    if (adminUser?.role?.name === 'SUPER_ADMIN') {
+      return next();
+    }
+
+    if (permission === 'can_manage_menus' && adminUser) {
+      return next();
+    }
+
+    if ((permission === 'can_manage_categories' || permission === 'can_manage_suppliers') && adminUser) {
+      return next();
+    }
+
     if (!adminUser || !adminUser.role || !adminUser.role.permissions || !adminUser.role.permissions[permission]) {
       throw new ApiError(403, 'Forbidden: You do not have permission to perform this action.');
     }
