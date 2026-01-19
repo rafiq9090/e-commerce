@@ -108,7 +108,25 @@ async function main() {
       { key: 'email_port', value: '587', type: 'TEXT' },
       { key: 'email_user', value: 'your@gmail.com', type: 'TEXT' },
       { key: 'email_pass', value: 'your_app_password', type: 'TEXT' },
-      { key: 'email_from', value: 'your@gmail.com', type: 'TEXT' }
+      { key: 'email_from', value: 'your@gmail.com', type: 'TEXT' },
+      { key: 'landing_what_you_get_title', value: 'What you get', type: 'TEXT' },
+      { key: 'landing_what_you_get_item_1', value: 'Original product package', type: 'TEXT' },
+      { key: 'landing_what_you_get_item_2', value: 'Warranty card & manual', type: 'TEXT' },
+      { key: 'landing_what_you_get_item_3', value: 'After-sales support', type: 'TEXT' },
+      { key: 'landing_what_you_get_note', value: 'Specs and package contents may vary by model.', type: 'TEXT' },
+      { key: 'show_bkash', value: 'false', type: 'TEXT' },
+      { key: 'show_nagad', value: 'false', type: 'TEXT' },
+      { key: 'bkash_number', value: '', type: 'TEXT' },
+      { key: 'nagad_number', value: '', type: 'TEXT' },
+      { key: 'bkash_env', value: 'sandbox', type: 'TEXT' },
+      { key: 'bkash_app_key', value: '', type: 'TEXT' },
+      { key: 'bkash_app_secret', value: '', type: 'TEXT' },
+      { key: 'bkash_username', value: '', type: 'TEXT' },
+      { key: 'bkash_password', value: '', type: 'TEXT' },
+      { key: 'nagad_env', value: 'sandbox', type: 'TEXT' },
+      { key: 'nagad_merchant_id', value: '', type: 'TEXT' },
+      { key: 'nagad_merchant_private_key', value: '', type: 'TEXT' },
+      { key: 'nagad_public_key', value: '', type: 'TEXT' }
     ]
   });
 

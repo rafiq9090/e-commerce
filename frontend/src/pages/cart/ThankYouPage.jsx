@@ -538,7 +538,7 @@ const ThankYouPage = () => {
           </Link>
         ) : (
           <Link
-            to="/dashboard/orders"
+            to="/profile"
             className="bg-gradient-to-r from-green-600 to-green-700 text-white py-4 px-8 rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 text-center font-semibold text-lg shadow-lg hover:shadow-xl"
           >
             View Orders

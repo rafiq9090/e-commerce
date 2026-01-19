@@ -8,6 +8,10 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
+    if (config.headers?.['X-Guest-Order']) {
+      delete config.headers['X-Guest-Order'];
+      return config;
+    }
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
       console.log(" Attaching token to request:", token);

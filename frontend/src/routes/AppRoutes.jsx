@@ -23,6 +23,7 @@ const ProductsPage = lazyWithPreload(() => import('../pages/products/ProductsPag
 const ProductLandingPage = lazyWithPreload(() => import('../pages/products/ProductLandingPage'));
 const AdminLogin = lazyWithPreload(() => import('../pages/admin/AdminLogin'));
 const AdminDashboard = lazyWithPreload(() => import('../pages/admin/AdminDashboard'));
+const OrderDetailsPage = lazyWithPreload(() => import('../pages/account/OrderDetailsPage'));
 const PolicyPage = lazyWithPreload(() => import('../pages/misc/PolicyPage'));
 const ContactPage = lazyWithPreload(() => import('../pages/misc/ContactPage'));
 const NotFound = lazyWithPreload(() => import('../pages/misc/NotFound'));
@@ -65,6 +66,7 @@ const AppRoutes = () => {
           <Route path="/order-success" element={<ThankYouPage />} />
           <Route path="/track-order" element={<TrackOrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/orders/:id" element={<OrderDetailsPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route
             path="/about"

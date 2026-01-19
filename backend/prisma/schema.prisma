@@ -150,6 +150,13 @@ model Product {
   seoDescription String? @db.Text
   seoKeywords    String?
 
+  // --- Landing Page Highlights ---
+  landingWhatYouGetTitle String?
+  landingWhatYouGetItem1 String?
+  landingWhatYouGetItem2 String?
+  landingWhatYouGetItem3 String?
+  landingWhatYouGetNote  String? @db.Text
+
   // --- NEW: Related Products Relation ---
   relatedProducts Product[] @relation("RelatedProducts")
   relatedTo       Product[] @relation("RelatedProducts")

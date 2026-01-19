@@ -23,7 +23,8 @@ import {
   ExternalLink,
   Upload,
   Mail,
-  Percent
+  Percent,
+  CreditCard
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -37,6 +38,143 @@ import { getAllBlocked, addToBlocklist, removeFromBlocklist } from '../../api/bl
 import { getNewsletterSubscribers, deleteNewsletterSubscriber, sendProductNewsletter, sendPromotionNewsletter } from '../../api/newsletterApi';
 import { getPromotions, createPromotion, deletePromotion } from '../../api/promotionApi';
 import { registerAdmin, getRoles, getAdmins } from '../../api/adminApi';
+import { EditorContent, useEditor } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import TextStyle from '@tiptap/extension-text-style';
+import Color from '@tiptap/extension-color';
+import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
+import Highlight from '@tiptap/extension-highlight';
+
+const FontStyle = Extension.create({
+  name: 'fontStyle',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['textStyle'],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: element => element.style.fontSize?.replace(/['"]+/g, '') || null,
+            renderHTML: attributes => {
+              if (!attributes.fontSize) return {};
+              return { style: `font-size: ${attributes.fontSize}` };
+            }
+          },
+          fontWeight: {
+            default: null,
+            parseHTML: element => element.style.fontWeight || null,
+            renderHTML: attributes => {
+              if (!attributes.fontWeight) return {};
+              return { style: `font-weight: ${attributes.fontWeight}` };
+            }
+          }
+        }
+      }
+    ];
+  }
+});
+
+const ToolbarButton = ({ active, onClick, children, title }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    className={`px-2 py-1 text-sm rounded border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+  >
+    {children}
+  </button>
+);
+
+const RichTextEditor = ({ value, onChange }) => {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3, 4] }
+      }),
+      Underline,
+      TextStyle,
+      FontStyle,
+      Color,
+      Link.configure({ openOnClick: false }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Highlight
+    ],
+    content: value || '',
+    editorProps: {
+      attributes: {
+        class: 'min-h-[140px] outline-none'
+      }
+    },
+    onUpdate: ({ editor: nextEditor }) => {
+      onChange(nextEditor.getHTML());
+    }
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+    const current = editor.getHTML();
+    if ((value || '') !== current) {
+      editor.commands.setContent(value || '', false);
+    }
+  }, [value, editor]);
+
+  if (!editor) return null;
+
+  const applyInlineHeading = (fontSize) => {
+    const currentSize = editor.getAttributes('textStyle').fontSize;
+    if (currentSize === fontSize) {
+      editor.chain().focus().unsetMark('textStyle').run();
+      return;
+    }
+    editor.chain().focus().setMark('textStyle', { fontSize, fontWeight: '700' }).run();
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg bg-white">
+      <div className="flex flex-wrap gap-2 p-2 border-b bg-gray-50">
+        <ToolbarButton title="Bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>B</ToolbarButton>
+        <ToolbarButton title="Italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>I</ToolbarButton>
+        <ToolbarButton title="Underline" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>U</ToolbarButton>
+        <ToolbarButton title="Strike" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>S</ToolbarButton>
+        <ToolbarButton title="Highlight" active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()}>H</ToolbarButton>
+        <div className="h-6 w-px bg-gray-200 mx-1" />
+        <ToolbarButton title="Heading 1 (Selected text)" active={editor.getAttributes('textStyle').fontSize === '1.75rem'} onClick={() => applyInlineHeading('1.75rem')}>H1</ToolbarButton>
+        <ToolbarButton title="Heading 2 (Selected text)" active={editor.getAttributes('textStyle').fontSize === '1.5rem'} onClick={() => applyInlineHeading('1.5rem')}>H2</ToolbarButton>
+        <ToolbarButton title="Heading 3 (Selected text)" active={editor.getAttributes('textStyle').fontSize === '1.25rem'} onClick={() => applyInlineHeading('1.25rem')}>H3</ToolbarButton>
+        <ToolbarButton title="Heading 4 (Selected text)" active={editor.getAttributes('textStyle').fontSize === '1.125rem'} onClick={() => applyInlineHeading('1.125rem')}>H4</ToolbarButton>
+        <ToolbarButton title="Bullet List" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>• List</ToolbarButton>
+        <ToolbarButton title="Ordered List" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>1. List</ToolbarButton>
+        <ToolbarButton title="Blockquote" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>"</ToolbarButton>
+        <div className="h-6 w-px bg-gray-200 mx-1" />
+        <ToolbarButton title="Align Left" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>L</ToolbarButton>
+        <ToolbarButton title="Align Center" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>C</ToolbarButton>
+        <ToolbarButton title="Align Right" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()}>R</ToolbarButton>
+        <div className="h-6 w-px bg-gray-200 mx-1" />
+        <ToolbarButton
+          title="Add Link"
+          active={editor.isActive('link')}
+          onClick={() => {
+            const url = window.prompt('Enter URL');
+            if (!url) return;
+            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+          }}
+        >
+          Link
+        </ToolbarButton>
+        <ToolbarButton title="Remove Link" active={false} onClick={() => editor.chain().focus().unsetLink().run()}>Unlink</ToolbarButton>
+      </div>
+      <div
+        className="p-3 min-h-[160px] prose max-w-none bg-white cursor-text"
+        onClick={() => editor.chain().focus().run()}
+      >
+        <EditorContent editor={editor} />
+      </div>
+    </div>
+  );
+};
 
 const AdminDashboard = () => {
   const { logout, user } = useAuth();
@@ -1072,6 +1210,80 @@ const SettingsManager = () => {
     setSettings(prev => ({ ...prev, [key]: val }));
   };
 
+  const handleSaveBkash = async () => {
+    const payload = [
+      { key: 'bkash_env', value: settings.bkash_env || 'sandbox', type: 'TEXT' },
+      { key: 'bkash_app_key', value: settings.bkash_app_key || '', type: 'TEXT' },
+      { key: 'bkash_app_secret', value: settings.bkash_app_secret || '', type: 'TEXT' },
+      { key: 'bkash_username', value: settings.bkash_username || '', type: 'TEXT' },
+      { key: 'bkash_password', value: settings.bkash_password || '', type: 'TEXT' }
+    ];
+    try {
+      await updateContent(payload);
+      alert('bKash settings saved');
+    } catch (e) {
+      alert('Failed to save bKash settings');
+    }
+  };
+
+  const handleSaveNagad = async () => {
+    const payload = [
+      { key: 'nagad_env', value: settings.nagad_env || 'sandbox', type: 'TEXT' },
+      { key: 'nagad_merchant_id', value: settings.nagad_merchant_id || '', type: 'TEXT' },
+      { key: 'nagad_merchant_private_key', value: settings.nagad_merchant_private_key || '', type: 'TEXT' },
+      { key: 'nagad_public_key', value: settings.nagad_public_key || '', type: 'TEXT' }
+    ];
+    try {
+      await updateContent(payload);
+      alert('Nagad settings saved');
+    } catch (e) {
+      alert('Failed to save Nagad settings');
+    }
+  };
+
+  const handleSaveSteadfast = async () => {
+    const payload = [
+      { key: 'steadfast_api_key', value: settings.steadfast_api_key || '', type: 'TEXT' },
+      { key: 'steadfast_secret_key', value: settings.steadfast_secret_key || '', type: 'TEXT' }
+    ];
+    try {
+      await updateContent(payload);
+      alert('Steadfast settings saved');
+    } catch (e) {
+      alert('Failed to save Steadfast settings');
+    }
+  };
+
+  const handleToggleChange = async (key, checked) => {
+    const val = checked ? 'true' : 'false';
+    setSettings(prev => ({ ...prev, [key]: val }));
+    try {
+      await updateContent({ key, value: val, type: 'TEXT' });
+    } catch (e) {
+      alert('Failed to save toggle');
+    }
+  };
+
+  const renderSelect = (label, key, options, showSaveButton = false) => (
+    <div className="space-y-2">
+      <label className="text-sm font-semibold text-gray-700">{label}</label>
+      <div className="flex gap-2">
+        <select
+          value={settings[key] || ''}
+          onChange={e => handleChange(key, e.target.value)}
+          className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white"
+        >
+          {options.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        {showSaveButton && (
+          <button onClick={() => handleSave(key)} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700">Save</button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">System Settings</h2>
@@ -1084,33 +1296,117 @@ const SettingsManager = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Steadfast API Key</label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={settings['steadfast_api_key'] || ''}
-                onChange={e => handleChange('steadfast_api_key', e.target.value)}
-                className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                placeholder="Enter API Key"
-              />
-              <button onClick={() => handleSave('steadfast_api_key')} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700">Save</button>
-            </div>
+            <input
+              type="password"
+              value={settings['steadfast_api_key'] || ''}
+              onChange={e => handleChange('steadfast_api_key', e.target.value)}
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              placeholder="Enter API Key"
+            />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Steadfast Secret Key</label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={settings['steadfast_secret_key'] || ''}
-                onChange={e => handleChange('steadfast_secret_key', e.target.value)}
-                className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                placeholder="Enter Secret Key"
-              />
-              <button onClick={() => handleSave('steadfast_secret_key')} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700">Save</button>
-            </div>
+            <input
+              type="password"
+              value={settings['steadfast_secret_key'] || ''}
+              onChange={e => handleChange('steadfast_secret_key', e.target.value)}
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              placeholder="Enter Secret Key"
+            />
           </div>
         </div>
+        <div className="flex justify-end mt-4">
+          <button onClick={handleSaveSteadfast} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Steadfast Settings</button>
+        </div>
         <p className="text-xs text-gray-500 mt-4">Used for calculating shipping charges and pushing orders to Steadfast courier service.</p>
+      </div>
+
+      {/* Payment Methods */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <CreditCard className="text-green-600" /> Payment Methods
+        </h3>
+        <div className="flex flex-col gap-3">
+          <label className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+            <span className="text-sm font-semibold text-gray-700">Show bKash</span>
+            <input
+              type="checkbox"
+              checked={settings['show_bkash'] === 'true'}
+              onChange={(e) => handleToggleChange('show_bkash', e.target.checked)}
+              className="w-5 h-5"
+            />
+          </label>
+          <label className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+            <span className="text-sm font-semibold text-gray-700">Show Nagad</span>
+            <input
+              type="checkbox"
+              checked={settings['show_nagad'] === 'true'}
+              onChange={(e) => handleToggleChange('show_nagad', e.target.checked)}
+              className="w-5 h-5"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* bKash Settings */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <span className="text-pink-600 font-black">bKash</span> Gateway Settings
+        </h3>
+        {renderSelect('Environment', 'bkash_env', [
+          { label: 'Sandbox', value: 'sandbox' },
+          { label: 'Production', value: 'production' }
+        ])}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">App Key</label>
+            <input value={settings['bkash_app_key'] || ''} onChange={e => handleChange('bkash_app_key', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">App Secret</label>
+            <input value={settings['bkash_app_secret'] || ''} onChange={e => handleChange('bkash_app_secret', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Username</label>
+            <input value={settings['bkash_username'] || ''} onChange={e => handleChange('bkash_username', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Password</label>
+            <input type="password" value={settings['bkash_password'] || ''} onChange={e => handleChange('bkash_password', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={handleSaveBkash} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save bKash Settings</button>
+        </div>
+      </div>
+
+      {/* Nagad Settings */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <span className="text-orange-600 font-black">Nagad</span> Gateway Settings
+        </h3>
+        {renderSelect('Environment', 'nagad_env', [
+          { label: 'Sandbox', value: 'sandbox' },
+          { label: 'Production', value: 'production' }
+        ])}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Merchant ID</label>
+            <input value={settings['nagad_merchant_id'] || ''} onChange={e => handleChange('nagad_merchant_id', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Merchant Private Key</label>
+            <input value={settings['nagad_merchant_private_key'] || ''} onChange={e => handleChange('nagad_merchant_private_key', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Public Key</label>
+            <input value={settings['nagad_public_key'] || ''} onChange={e => handleChange('nagad_public_key', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={handleSaveNagad} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Nagad Settings</button>
+        </div>
       </div>
 
       {/* General Settings Placeholder */}
@@ -1142,9 +1438,11 @@ const ProductsManager = () => {
   const [formData, setFormData] = useState({
     name: '', slug: '', description: '', short_description: '', regular_price: '', sale_price: '',
     categoryId: '', supplierId: '', inventory: 0, images: [], status: 'DRAFT',
-    seoTitle: '', seoDescription: '', seoKeywords: ''
+    seoTitle: '', seoDescription: '', seoKeywords: '',
+    landingWhatYouGetTitle: '', landingWhatYouGetItem1: '', landingWhatYouGetItem2: '', landingWhatYouGetItem3: '', landingWhatYouGetNote: ''
   });
   const [notifySubscribers, setNotifySubscribers] = useState(false);
+
 
   const fetchData = async () => {
     setLoading(true);
@@ -1288,7 +1586,12 @@ const ProductsManager = () => {
       inventory: p.inventory?.quantity || 0,
       images: currentImages,
       status: p.status || 'DRAFT',
-      seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || ''
+      seoTitle: p.seoTitle || '', seoDescription: p.seoDescription || '', seoKeywords: p.seoKeywords || '',
+      landingWhatYouGetTitle: p.landingWhatYouGetTitle || '',
+      landingWhatYouGetItem1: p.landingWhatYouGetItem1 || '',
+      landingWhatYouGetItem2: p.landingWhatYouGetItem2 || '',
+      landingWhatYouGetItem3: p.landingWhatYouGetItem3 || '',
+      landingWhatYouGetNote: p.landingWhatYouGetNote || ''
     });
     setIsModalOpen(true);
   };
@@ -1299,7 +1602,8 @@ const ProductsManager = () => {
       name: '', slug: '', description: '', short_description: '', regular_price: '', sale_price: '',
       categoryId: categories[0]?.id || '', supplierId: suppliers[0]?.id || '', inventory: 0,
       images: [], status: 'DRAFT',
-      seoTitle: '', seoDescription: '', seoKeywords: ''
+      seoTitle: '', seoDescription: '', seoKeywords: '',
+      landingWhatYouGetTitle: '', landingWhatYouGetItem1: '', landingWhatYouGetItem2: '', landingWhatYouGetItem3: '', landingWhatYouGetNote: ''
     });
     setNotifySubscribers(false);
   };
@@ -1412,7 +1716,13 @@ const ProductsManager = () => {
               </div>
 
               <textarea name="short_description" value={formData.short_description} onChange={handleInputChange} placeholder="Short Description (for lists)" className="w-full border p-2 rounded h-16" />
-              <textarea name="description" value={formData.description} onChange={handleInputChange} placeholder="Full Description" className="w-full border p-2 rounded h-24" required />
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Full Description</label>
+                <RichTextEditor
+                  value={formData.description}
+                  onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input type="number" name="regular_price" value={formData.regular_price} onChange={handleInputChange} placeholder="Price" className="border p-2 rounded" required />
@@ -1473,6 +1783,17 @@ const ProductsManager = () => {
                     <input name="seoKeywords" value={formData.seoKeywords} onChange={handleInputChange} placeholder="widget, buy widget, best widget" className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none" />
                   </div>
                 </div>
+              </div>
+              {/* Landing Highlights */}
+              <div className="border-t pt-4 bg-white p-4 rounded-lg">
+                <h4 className="text-sm font-bold mb-3 text-gray-700 flex items-center gap-2"><span className="text-amber-500">📦</span> Landing Highlights</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input name="landingWhatYouGetTitle" value={formData.landingWhatYouGetTitle} onChange={handleInputChange} placeholder="What you get title" className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none" />
+                  <input name="landingWhatYouGetItem1" value={formData.landingWhatYouGetItem1} onChange={handleInputChange} placeholder="Item 1" className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none" />
+                  <input name="landingWhatYouGetItem2" value={formData.landingWhatYouGetItem2} onChange={handleInputChange} placeholder="Item 2" className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none" />
+                  <input name="landingWhatYouGetItem3" value={formData.landingWhatYouGetItem3} onChange={handleInputChange} placeholder="Item 3" className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none" />
+                </div>
+                <textarea name="landingWhatYouGetNote" value={formData.landingWhatYouGetNote} onChange={handleInputChange} placeholder="Note" className="w-full border p-2 rounded text-sm h-16 focus:ring-2 focus:ring-blue-100 outline-none mt-3" />
               </div>
               {!editingProduct && (
                 <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -1802,7 +2123,15 @@ const OrdersManager = () => {
   };
 
   const handlePrintInvoice = (order) => {
+    const items = order.items || order.orderItems || [];
+    const shippingLine1 = order.shippingAddress?.addressLine1 || order.address?.fullAddress || order.fullAddress || '';
+    const shippingCity = order.shippingAddress?.city || '';
+    const shippingPostal = order.shippingAddress?.postalCode || '';
+    const paymentMethod = order.payment?.paymentMethod || order.paymentMethod || 'Cash On Delivery';
+    const totalAmount = Number(order.totalAmount || 0).toFixed(2);
+
     const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
     const invoiceHTML = `
       <!DOCTYPE html>
       <html>
@@ -1871,14 +2200,14 @@ const OrdersManager = () => {
               <p><strong>${order.customerName}</strong></p>
               <p>${order.customerEmail || 'No Email Provided'}</p>
               <p>${order.customerPhone || 'No Phone Provided'}</p>
-              <p>${order.shippingAddress ? order.shippingAddress.addressLine1 : ''}</p>
-              <p>${order.shippingAddress ? order.shippingAddress.city + ', ' + (order.shippingAddress.postalCode || '') : ''}</p>
+              <p>${shippingLine1}</p>
+              <p>${shippingCity}${shippingPostal ? `, ${shippingPostal}` : ''}</p>
             </div>
             <div class="info-group">
               <h3>Order Details</h3>
               <p><strong>Date Issued:</strong> ${new Date(order.createdAt).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })}</p>
               <p><strong>Order Status:</strong> <span style="text-transform: capitalize">${order.status.toLowerCase()}</span></p>
-              <p><strong>Payment Method:</strong> ${order.paymentMethod || 'Cash On Delivery'}</p>
+              <p><strong>Payment Method:</strong> ${paymentMethod}</p>
             </div>
           </div>
 
@@ -1892,14 +2221,19 @@ const OrdersManager = () => {
               </tr>
             </thead>
             <tbody>
-              ${order.items.map(item => `
+              ${items.map(item => {
+                const name = item.productName || item.product?.name || `Product #${item.productId || ''}`;
+                const unitPrice = Number(item.price ?? item.unitPrice ?? 0);
+                const qty = Number(item.quantity || 0);
+                return `
                 <tr>
-                  <td><span class="item-name">${item.productName}</span></td>
-                  <td class="col-right">৳${item.price}</td>
-                  <td class="col-right">${item.quantity}</td>
-                  <td class="col-right"><strong>৳${(item.price * item.quantity).toFixed(2)}</strong></td>
+                  <td><span class="item-name">${name}</span></td>
+                  <td class="col-right">৳${unitPrice.toFixed(2)}</td>
+                  <td class="col-right">${qty}</td>
+                  <td class="col-right"><strong>৳${(unitPrice * qty).toFixed(2)}</strong></td>
                 </tr>
-              `).join('')}
+              `;
+              }).join('')}
             </tbody>
           </table>
 
@@ -1907,7 +2241,7 @@ const OrdersManager = () => {
             <div class="summary-box">
               <div class="summary-row">
                 <span>Subtotal</span>
-                <span>৳${order.totalAmount}</span>
+                <span>৳${totalAmount}</span>
               </div>
               <div class="summary-row">
                 <span>Shipping</span>
@@ -1915,7 +2249,7 @@ const OrdersManager = () => {
               </div>
               <div class="summary-row total">
                 <span>Total Due</span>
-                <span style="color: #2563eb">৳${order.totalAmount}</span>
+                <span style="color: #2563eb">৳${totalAmount}</span>
               </div>
             </div>
           </div>
@@ -2042,17 +2376,25 @@ const OrdersManager = () => {
                   </div>
                 </div>
 
-                <h4 className="font-bold text-lg border-b pb-2 mt-6">Shipping Address</h4>
-                {selectedOrder.shippingAddress ? (
-                  <div className="text-sm space-y-1">
-                    <p className="font-medium">{selectedOrder.shippingAddress.fullName}</p>
-                    <p>{selectedOrder.shippingAddress.addressLine1}</p>
-                    {(selectedOrder.shippingAddress.addressLine2) && <p>{selectedOrder.shippingAddress.addressLine2}</p>}
-                    <p>{selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.postalCode}</p>
-                    <p>{selectedOrder.shippingAddress.country}</p>
-                    <p className="text-gray-500 mt-2">Phone: {selectedOrder.shippingAddress.phone}</p>
-                  </div>
-                ) : <p className="text-sm text-gray-400">No Shipping Info</p>}
+                {(selectedOrder.shippingAddress || selectedOrder.fullAddress || selectedOrder.address?.fullAddress) && (
+                  <>
+                    <h4 className="font-bold text-lg border-b pb-2 mt-6">Shipping Address</h4>
+                    {selectedOrder.shippingAddress ? (
+                      <div className="text-sm space-y-1">
+                        <p className="font-medium">{selectedOrder.shippingAddress.fullName}</p>
+                        <p>{selectedOrder.shippingAddress.addressLine1}</p>
+                        {(selectedOrder.shippingAddress.addressLine2) && <p>{selectedOrder.shippingAddress.addressLine2}</p>}
+                        <p>{selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.postalCode}</p>
+                        <p>{selectedOrder.shippingAddress.country}</p>
+                        <p className="text-gray-500 mt-2">Phone: {selectedOrder.shippingAddress.phone}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-700 whitespace-pre-line">
+                        {selectedOrder.fullAddress || selectedOrder.address?.fullAddress}
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Order Items */}

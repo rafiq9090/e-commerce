@@ -35,6 +35,12 @@ const ProfilePage = () => {
   }
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      setError('You are a guest customer. Please login to view order history.');
+      return;
+    }
+
     const loadProfileData = async () => {
       try {
         setLoading(true);
@@ -50,7 +56,7 @@ const ProfilePage = () => {
       }
     };
     loadProfileData();
-  }, []);
+  }, [user]);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -122,12 +128,21 @@ const ProfilePage = () => {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Profile</h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
-          >
-            Try Again
-          </button>
+          {error.toLowerCase().includes('guest') ? (
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+            >
+              Login to View Orders
+            </Link>
+          ) : (
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+            >
+              Try Again
+            </button>
+          )}
         </div>
       </div>
     );

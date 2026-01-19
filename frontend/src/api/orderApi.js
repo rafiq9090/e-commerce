@@ -10,6 +10,18 @@ export const placeOrder = async (orderData) => {
   }
 };
 
+export const placeGuestOrder = async (orderData) => {
+  try {
+    const response = await apiClient.post('/orders', orderData, {
+      headers: { 'X-Guest-Order': 'true' }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error placing guest order:', error.response?.data || error.message);
+    throw error.response?.data || error;
+  }
+};
+
 export const trackOrderPublic = async (orderId) => {
   try {
     const response = await apiClient.get(`/orders/track/${orderId}`);

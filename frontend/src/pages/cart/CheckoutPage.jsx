@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { placeOrder } from '../../api/orderApi';
+import { getAllContent } from '../../api/contentApi';
 import {
   ShoppingBag,
   User,
@@ -37,6 +38,8 @@ const CheckoutPage = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [orderItems, setOrderItems] = useState([]);
+  const [siteContent, setSiteContent] = useState({});
+  const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -58,6 +61,25 @@ const CheckoutPage = () => {
       }
     }
   }, [isAuthenticated, cartItems, location.state]);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const res = await getAllContent();
+        const data = res.data || res;
+        if (Array.isArray(data)) {
+          const map = {};
+          data.forEach((item) => { map[item.key] = item.value; });
+          setSiteContent(map);
+        } else if (data && typeof data === 'object') {
+          setSiteContent(data);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchContent();
+  }, []);
 
   const subtotal = orderItems.reduce((total, item) => {
     const price = parseFloat(item.product.sale_price || item.product.regular_price);
@@ -108,7 +130,7 @@ const CheckoutPage = () => {
           cartId: cart?.id,
           fullAddress,
           phone,
-          paymentMethod: "Cash on Delivery",
+          paymentMethod,
         };
       } else {
         const items = orderItems.map(item => ({
@@ -121,7 +143,7 @@ const CheckoutPage = () => {
           items: items,
           fullAddress,
           phone,
-          paymentMethod: "Cash on Delivery",
+          paymentMethod,
           guestDetails: {
             name: name.trim(),
             phone: phone.trim(),
@@ -383,15 +405,66 @@ const CheckoutPage = () => {
               </div>
 
               {/* Payment Method */}
-              <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200">
-                <div className="flex items-center gap-4">
-                  <div className="bg-green-600 p-3 rounded-xl">
+              <div className="mb-8 bg-white rounded-2xl p-6 border-2 border-gray-200">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="bg-blue-600 p-3 rounded-xl">
                     <CreditCard className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900 text-lg">Cash on Delivery</p>
-                    <p className="text-green-700">Pay when you receive your order</p>
+                    <p className="font-bold text-gray-900 text-lg">Payment Method</p>
+                    <p className="text-gray-600">Choose how you want to pay</p>
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer ${paymentMethod === 'Cash on Delivery' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={paymentMethod === 'Cash on Delivery'}
+                        onChange={() => setPaymentMethod('Cash on Delivery')}
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900">Cash on Delivery</p>
+                        <p className="text-sm text-gray-500">Pay when you receive your order</p>
+                      </div>
+                    </div>
+                  </label>
+
+                  {siteContent.show_bkash === 'true' && (
+                    <label className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer ${paymentMethod === 'bKash' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          checked={paymentMethod === 'bKash'}
+                          onChange={() => setPaymentMethod('bKash')}
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-900">bKash</p>
+                          <p className="text-sm text-gray-500">Send money to {siteContent.bkash_number || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </label>
+                  )}
+
+                  {siteContent.show_nagad === 'true' && (
+                    <label className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer ${paymentMethod === 'Nagad' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          checked={paymentMethod === 'Nagad'}
+                          onChange={() => setPaymentMethod('Nagad')}
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-900">Nagad</p>
+                          <p className="text-sm text-gray-500">Send money to {siteContent.nagad_number || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </label>
+                  )}
                 </div>
               </div>
 

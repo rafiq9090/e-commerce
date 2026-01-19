@@ -519,11 +519,10 @@ const ProductDetailPage = () => {
               <div className="w-1.5 h-10 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></div>
               Product Description
             </h2>
-            <div className="prose max-w-none">
-              <p className="text-gray-700 leading-relaxed text-lg whitespace-pre-line">
-                {product.description}
-              </p>
-            </div>
+            <div
+              className="rich-text text-lg"
+              dangerouslySetInnerHTML={{ __html: product.description }}
+            />
           </div>
         )}
 

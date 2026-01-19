@@ -5,6 +5,7 @@ import { getAllContent } from '../../api/contentApi';
 
 const Hero = () => {
   const [content, setContent] = useState({});
+  const [parallaxOffset, setParallaxOffset] = useState(0);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -26,6 +27,23 @@ const Hero = () => {
     fetchContent();
   }, []);
 
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const y = window.scrollY || 0;
+          setParallaxOffset(y);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Defaults
   const headline = content.hero_headline || "Elevate Your Shopping Standard";
   // Split headline for styling if contains newline or break logic, simpler here to just render
@@ -42,8 +60,14 @@ const Hero = () => {
 
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[20%] -right-[10%] w-[50vw] h-[50vw] bg-purple-200/40 rounded-full blur-[100px] animate-pulse"></div>
-        <div className="absolute -bottom-[20%] -left-[10%] w-[50vw] h-[50vw] bg-blue-200/40 rounded-full blur-[100px] animate-pulse delay-700"></div>
+        <div
+          className="absolute -top-[20%] -right-[10%] w-[50vw] h-[50vw] bg-purple-200/40 rounded-full blur-[100px] animate-pulse"
+          style={{ transform: `translateY(${parallaxOffset * 0.08}px)` }}
+        ></div>
+        <div
+          className="absolute -bottom-[20%] -left-[10%] w-[50vw] h-[50vw] bg-blue-200/40 rounded-full blur-[100px] animate-pulse delay-700"
+          style={{ transform: `translateY(${parallaxOffset * -0.06}px)` }}
+        ></div>
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 brightness-100 contrast-150 mix-blend-overlay"></div>
       </div>
 
@@ -110,8 +134,14 @@ const Hero = () => {
 
           {/* --- Image Section --- */}
           <div className="relative group perspective-1000">
-            <div className="absolute inset-0 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-500 transform rotate-6 scale-95"></div>
-            <div className="relative bg-white/5 backdrop-blur-xl border border-white/20 p-4 rounded-[2.5rem] shadow-2xl transform transition-all duration-500 hover:rotate-1 hover:scale-[1.02]">
+            <div
+              className="absolute inset-0 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-500 transform rotate-6 scale-95"
+              style={{ transform: `translateY(${parallaxOffset * -0.03}px) rotate(6deg) scale(0.95)` }}
+            ></div>
+            <div
+              className="relative bg-white/5 backdrop-blur-xl border border-white/20 p-4 rounded-[2.5rem] shadow-2xl transform transition-all duration-500 hover:rotate-1 hover:scale-[1.02]"
+              style={{ transform: `translateY(${parallaxOffset * 0.03}px)` }}
+            >
               <div className="relative rounded-[2rem] overflow-hidden aspect-[4/3] group">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10 opacity-60"></div>
                 <img

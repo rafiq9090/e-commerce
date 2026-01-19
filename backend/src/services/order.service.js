@@ -252,6 +252,35 @@ class OrderService {
     });
   }
 
+  static async getOrderDetails(orderId, userId) {
+    const idAsInt = parseInt(orderId);
+    if (isNaN(idAsInt)) {
+      throw new ApiError(400, 'Invalid Order ID format.');
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: idAsInt, userId },
+      include: {
+        history: { orderBy: { createdAt: 'desc' } },
+        orderItems: {
+          include: {
+            product: {
+              select: { name: true, images: true, slug: true }
+            }
+          }
+        },
+        address: true,
+        payment: true
+      }
+    });
+
+    if (!order) {
+      throw new ApiError(404, 'Order not found.');
+    }
+
+    return order;
+  }
+
 
   static async getAllOrders(filters = {}) {
     const { status, startDate, endDate, customer, search } = filters;

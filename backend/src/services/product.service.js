@@ -6,7 +6,7 @@ const ActivityLogService = require('./activityLog.service');
 class ProductService {
   static async createProduct(productData) {
     const { inventory, ...data } = productData;
-    const { name, description, short_description, regular_price, sale_price, categoryId, supplierId, status, seoTitle, seoDescription, seoKeywords, isFeatured, images } = data;
+    const { name, description, short_description, regular_price, sale_price, categoryId, supplierId, status, seoTitle, seoDescription, seoKeywords, isFeatured, images, landingWhatYouGetTitle, landingWhatYouGetItem1, landingWhatYouGetItem2, landingWhatYouGetItem3, landingWhatYouGetNote } = data;
 
     // Better slug generation with uniqueness check
     let slug = name.toLowerCase().split(' ').join('-');
@@ -53,6 +53,11 @@ class ProductService {
         seoTitle,
         seoDescription,
         seoKeywords,
+        landingWhatYouGetTitle,
+        landingWhatYouGetItem1,
+        landingWhatYouGetItem2,
+        landingWhatYouGetItem3,
+        landingWhatYouGetNote,
         inventory: {
           create: inventoryData
         },
@@ -190,7 +195,7 @@ class ProductService {
 
   static async updateProduct(productId, productData, adminId) {
     const { inventory, ...data } = productData;
-    const { isFeatured, name, description, short_description, regular_price, sale_price, status, categoryId, supplierId, seoTitle, seoDescription, seoKeywords, images } = data;
+    const { isFeatured, name, description, short_description, regular_price, sale_price, status, categoryId, supplierId, seoTitle, seoDescription, seoKeywords, images, landingWhatYouGetTitle, landingWhatYouGetItem1, landingWhatYouGetItem2, landingWhatYouGetItem3, landingWhatYouGetNote } = data;
 
     let slug;
     if (name) {
@@ -223,6 +228,11 @@ class ProductService {
       seoTitle,
       seoDescription,
       seoKeywords,
+      landingWhatYouGetTitle,
+      landingWhatYouGetItem1,
+      landingWhatYouGetItem2,
+      landingWhatYouGetItem3,
+      landingWhatYouGetNote,
     };
 
     // Only include inventory if provided
