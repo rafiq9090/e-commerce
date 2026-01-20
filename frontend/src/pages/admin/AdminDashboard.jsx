@@ -38,6 +38,7 @@ import { getAllBlocked, addToBlocklist, removeFromBlocklist } from '../../api/bl
 import { getNewsletterSubscribers, deleteNewsletterSubscriber, sendProductNewsletter, sendPromotionNewsletter } from '../../api/newsletterApi';
 import { getPromotions, createPromotion, deletePromotion } from '../../api/promotionApi';
 import { registerAdmin, getRoles, getAdmins } from '../../api/adminApi';
+import { listIncompleteOrders, clearIncompleteOrder } from '../../api/incompleteOrderApi';
 import { createSteadfastOrder, createSteadfastBulkOrders } from '../../api/courierApi';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
@@ -183,6 +184,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [counts, setCounts] = useState({ products: 0, orders: 0 });
+  const [incompleteCount, setIncompleteCount] = useState(0);
 
   const fetchNotificationCounts = async () => {
     try {
@@ -213,6 +215,22 @@ const AdminDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const fetchIncompleteCount = async () => {
+    try {
+      const res = await listIncompleteOrders();
+      const data = res.data || res;
+      setIncompleteCount(Array.isArray(data) ? data.length : 0);
+    } catch (e) {
+      setIncompleteCount(0);
+    }
+  };
+
+  useEffect(() => {
+    fetchIncompleteCount();
+    const interval = setInterval(fetchIncompleteCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     if (tab === 'orders') {
@@ -236,6 +254,7 @@ const AdminDashboard = () => {
       case 'products': return <ProductsManager />;
       case 'offers': return <PromotionsManager />;
       case 'orders': return <OrdersManager />;
+      case 'incomplete': return <IncompleteOrdersManager setIncompleteCount={setIncompleteCount} />;
       case 'categories': return <CategoriesManager />;
       case 'suppliers': return <SuppliersManager />;
       case 'menus': return <MenusManager />;
@@ -276,6 +295,15 @@ const AdminDashboard = () => {
             isOpen={isSidebarOpen}
             badge={counts.orders > 0 ? counts.orders : null}
             badgeColor="bg-red-500"
+          />
+          <SidebarItem
+            icon={<AlertTriangle size={20} />}
+            label="Incomplete Orders"
+            active={activeTab === 'incomplete'}
+            onClick={() => handleTabChange('incomplete')}
+            isOpen={isSidebarOpen}
+            badge={incompleteCount > 0 ? incompleteCount : null}
+            badgeColor="bg-orange-500"
           />
 
           <SidebarItem icon={<Layers size={20} />} label="Categories" active={activeTab === 'categories'} onClick={() => handleTabChange('categories')} isOpen={isSidebarOpen} />
@@ -1323,6 +1351,50 @@ const SettingsManager = () => {
           <button onClick={handleSaveSteadfast} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Steadfast Settings</button>
         </div>
         <p className="text-xs text-gray-500 mt-4">Used for calculating shipping charges and pushing orders to Steadfast courier service.</p>
+      </div>
+
+      {/* Order Control Settings */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <ShieldAlert className="text-red-600" /> Order Control (Fake Order Prevention)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <label className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 md:col-span-2">
+            <span className="text-sm font-semibold text-gray-700">Show Delivery Success Rate on Checkout</span>
+            <input
+              type="checkbox"
+              checked={settings['show_order_success_rate'] !== 'false'}
+              onChange={(e) => handleToggleChange('show_order_success_rate', e.target.checked)}
+              className="w-5 h-5"
+            />
+          </label>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Minimum Delivery Success Rate (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={settings['min_order_success_rate'] || ''}
+              onChange={e => handleChange('min_order_success_rate', e.target.value)}
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              placeholder="e.g. 60"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Customer Support Phone</label>
+            <input
+              value={settings['support_phone'] || ''}
+              onChange={e => handleChange('support_phone', e.target.value)}
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              placeholder="01XXXXXXXXX"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end mt-4 gap-2">
+          <button onClick={() => handleSave('min_order_success_rate')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Rate</button>
+          <button onClick={() => handleSave('support_phone')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Support Phone</button>
+        </div>
+        <p className="text-xs text-gray-500 mt-4">If a customer&apos;s delivery success rate is below this threshold, new orders are blocked and a support message is shown.</p>
       </div>
 
       {/* Payment Methods */}
@@ -2551,6 +2623,85 @@ const OrdersManager = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const IncompleteOrdersManager = ({ setIncompleteCount }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchIncomplete = async () => {
+    setLoading(true);
+    try {
+      const res = await listIncompleteOrders();
+      const data = res.data || res;
+      setOrders(data);
+      setIncompleteCount(Array.isArray(data) ? data.length : 0);
+    } catch (err) {
+      setOrders([]);
+      setIncompleteCount(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchIncomplete(); }, []);
+
+  const handleClear = async (order) => {
+    if (!window.confirm('Remove this incomplete order?')) return;
+    try {
+      await clearIncompleteOrder(order.clientId, order.source);
+      fetchIncomplete();
+    } catch (err) {
+      alert(err?.message || err?.response?.data?.message || 'Failed to remove');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Incomplete Orders</h2>
+        <button onClick={fetchIncomplete} className="text-blue-600 hover:underline text-sm font-medium">Refresh</button>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="p-4">Name</th>
+              <th className="p-4">Phone</th>
+              <th className="p-4">Address</th>
+              <th className="p-4">Source</th>
+              <th className="p-4">Last Update</th>
+              <th className="p-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {loading && (
+              <tr>
+                <td className="p-4 text-gray-500" colSpan={6}>Loading...</td>
+              </tr>
+            )}
+            {!loading && orders.length === 0 && (
+              <tr>
+                <td className="p-4 text-gray-500" colSpan={6}>No incomplete orders.</td>
+              </tr>
+            )}
+            {!loading && orders.map(order => (
+              <tr key={`${order.clientId}-${order.source}`}>
+                <td className="p-4">{order.name}</td>
+                <td className="p-4">{order.phone}</td>
+                <td className="p-4">{order.address}, {order.city}</td>
+                <td className="p-4 capitalize">{order.source}</td>
+                <td className="p-4">{new Date(order.updatedAt).toLocaleString()}</td>
+                <td className="p-4 text-right">
+                  <button onClick={() => handleClear(order)} className="text-red-600 hover:underline text-sm">Remove</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

@@ -47,6 +47,16 @@ export const trackOrderSecure = async (orderId, identifier) => {
 };
 export const trackOrder = trackOrderPublic;
 
+export const getPhoneOrderStats = async (phone) => {
+  try {
+    const response = await apiClient.get('/orders/phone-stats', { params: { phone } });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching phone order stats:', error.response?.data || error.message);
+    throw error.response?.data || error;
+  }
+};
+
 export const getOrderHistory = async () => {
   try {
     const response = await apiClient.get('/orders/my-orders'); 

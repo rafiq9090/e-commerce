@@ -21,6 +21,7 @@ const newsletterRoutes = require('./newsletter.routes');
 const uploadRoutes = require('./upload.routes');
 const paymentRoutes = require('./payment.routes');
 const courierRoutes = require('./courier.routes');
+const incompleteOrderRoutes = require('./incompleteOrder.routes');
 
 
 // Use module routers
@@ -42,5 +43,6 @@ router.use('/newsletter', newsletterRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/courier', courierRoutes);
+router.use('/incomplete-orders', incompleteOrderRoutes);
 
 module.exports = router;

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { placeOrder } from '../../api/orderApi';
+import { placeOrder, getPhoneOrderStats } from '../../api/orderApi';
+import { upsertIncompleteOrder, clearIncompleteOrder } from '../../api/incompleteOrderApi';
 import { createBkashPayment, createNagadPayment } from '../../api/paymentApi';
 import { getAllContent } from '../../api/contentApi';
 import {
@@ -41,6 +42,10 @@ const CheckoutPage = () => {
   const [orderItems, setOrderItems] = useState([]);
   const [siteContent, setSiteContent] = useState({});
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneStats, setPhoneStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [incompleteClientId, setIncompleteClientId] = useState('');
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -82,6 +87,88 @@ const CheckoutPage = () => {
     fetchContent();
   }, []);
 
+  useEffect(() => {
+    const stored = localStorage.getItem('incomplete_order_client_id_checkout');
+    if (stored) {
+      setIncompleteClientId(stored);
+      return;
+    }
+    const generated = crypto.randomUUID();
+    localStorage.setItem('incomplete_order_client_id_checkout', generated);
+    setIncompleteClientId(generated);
+  }, []);
+
+  useEffect(() => {
+    if (siteContent.show_order_success_rate === 'false') {
+      setPhoneError('');
+      setPhoneStats(null);
+      setStatsLoading(false);
+      return;
+    }
+    const normalized = phone.replace(/\D/g, '');
+    if (!normalized) {
+      setPhoneError('');
+      setPhoneStats(null);
+      return;
+    }
+
+    if (!/^\d{0,11}$/.test(normalized)) {
+      setPhoneError('Only digits are allowed');
+      setPhoneStats(null);
+      return;
+    }
+
+    if (normalized.length !== 11) {
+      setPhoneError('Phone number must be 11 digits');
+      setPhoneStats(null);
+      return;
+    }
+
+    setPhoneError('');
+    setStatsLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await getPhoneOrderStats(normalized);
+        const data = res.data || res;
+        setPhoneStats(data);
+      } catch (err) {
+        setPhoneStats(null);
+      } finally {
+        setStatsLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [phone, siteContent.show_order_success_rate]);
+
+  useEffect(() => {
+    if (!incompleteClientId) return;
+    const nameFilled = name.trim().length > 0;
+    const phoneFilled = /^\d{11}$/.test(phone.replace(/\D/g, ''));
+    const addressFilled = street.trim().length > 0;
+    const cityFilled = city.trim().length > 0;
+
+    if (!(nameFilled && phoneFilled && addressFilled && cityFilled)) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        await upsertIncompleteOrder({
+          clientId: incompleteClientId,
+          source: 'checkout',
+          name: name.trim(),
+          phone: phone.replace(/\D/g, ''),
+          email: email.trim(),
+          address: street.trim(),
+          city: city.trim(),
+        });
+      } catch (err) {
+        // ignore
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [incompleteClientId, name, phone, email, street, city]);
+
   const subtotal = orderItems.reduce((total, item) => {
     const price = parseFloat(item.product.sale_price || item.product.regular_price);
     return total + price * item.quantity;
@@ -89,6 +176,10 @@ const CheckoutPage = () => {
 
   const shippingCost = subtotal > 500 ? 0 : 60;
   const totalPrice = subtotal + shippingCost;
+  const minSuccessRate = Number(siteContent.min_order_success_rate || 0);
+  const supportPhone = siteContent.support_phone || siteContent.contact_phone || '';
+  const successRate = phoneStats?.successRate;
+  const isBelowThreshold = Number.isFinite(successRate) && minSuccessRate > 0 && successRate < minSuccessRate;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -110,13 +201,19 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (!phone.trim()) {
+    const cleanedPhone = phone.replace(/\D/g, '');
+    if (!cleanedPhone) {
       setError('Phone number is required');
       return;
     }
 
     if (!street.trim() || !city.trim()) {
       setError('Street address and city are required');
+      return;
+    }
+
+    if (isBelowThreshold) {
+      setError(`Order blocked due to low delivery success rate (${successRate}%). Please contact support ${supportPhone}.`);
       return;
     }
 
@@ -130,7 +227,7 @@ const CheckoutPage = () => {
         orderData = {
           cartId: cart?.id,
           fullAddress,
-          phone,
+          phone: cleanedPhone,
           paymentMethod,
         };
       } else {
@@ -143,11 +240,11 @@ const CheckoutPage = () => {
           cartId: cart?.id,
           items: items,
           fullAddress,
-          phone,
+          phone: cleanedPhone,
           paymentMethod,
           guestDetails: {
             name: name.trim(),
-            phone: phone.trim(),
+            phone: cleanedPhone,
             email: email.trim() || undefined
           },
         };
@@ -168,6 +265,10 @@ const CheckoutPage = () => {
 
       } catch (e) {
         console.warn('Frontend clear cart error:', e);
+      }
+
+      if (incompleteClientId) {
+        clearIncompleteOrder(incompleteClientId, 'checkout').catch(() => {});
       }
 
       if (paymentMethod === 'bKash') {
@@ -356,10 +457,22 @@ const CheckoutPage = () => {
                         type="tel"
                         className="w-full px-4 py-3 text-slate-500 border-2 border-gray-200 rounded-xl  focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
                         required
                         placeholder="+880 1XXX-XXXXXX"
                       />
+                      {phoneError && <p className="text-xs text-red-600 mt-1">{phoneError}</p>}
+                      {siteContent.show_order_success_rate !== 'false' && statsLoading && !phoneError && <p className="text-xs text-gray-500 mt-1">Checking delivery success rate...</p>}
+                      {siteContent.show_order_success_rate !== 'false' && phoneStats && !phoneError && (
+                        <p className={`text-xs mt-1 ${isBelowThreshold ? 'text-red-600' : 'text-green-600'}`}>
+                          Delivered: {phoneStats.delivered} | Cancelled: {phoneStats.cancelled} | Delivery Success Rate: {successRate === null ? 'N/A' : `${successRate}%`}
+                        </p>
+                      )}
+                      {siteContent.show_order_success_rate !== 'false' && isBelowThreshold && (
+                        <p className="text-xs text-red-600 mt-1">
+                          Please contact customer support {supportPhone}.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

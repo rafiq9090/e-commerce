@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProductBySlug } from '../../api/productApi';
 import { getAllContent } from '../../api/contentApi';
-import { placeGuestOrder } from '../../api/orderApi';
+import { placeGuestOrder, getPhoneOrderStats } from '../../api/orderApi';
+import { upsertIncompleteOrder, clearIncompleteOrder } from '../../api/incompleteOrderApi';
 import { createBkashPayment, createNagadPayment } from '../../api/paymentApi';
 import { ShoppingCart, Check, Star, ShieldCheck, Truck, Clock, Menu, X, ChevronDown, Award, Heart, ThumbsUp, CreditCard, Banknote } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
@@ -26,6 +27,10 @@ const ProductLandingPage = () => {
     const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
     const [orderLoading, setOrderLoading] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(false);
+    const [phoneError, setPhoneError] = useState('');
+    const [phoneStats, setPhoneStats] = useState(null);
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [incompleteClientId, setIncompleteClientId] = useState('');
 
     useEffect(() => {
         let ticking = false;
@@ -82,6 +87,88 @@ const ProductLandingPage = () => {
         fetchContent();
     }, []);
 
+    useEffect(() => {
+        const stored = localStorage.getItem('incomplete_order_client_id_landing');
+        if (stored) {
+            setIncompleteClientId(stored);
+            return;
+        }
+        const generated = crypto.randomUUID();
+        localStorage.setItem('incomplete_order_client_id_landing', generated);
+        setIncompleteClientId(generated);
+    }, []);
+
+    useEffect(() => {
+        if (siteContent.show_order_success_rate === 'false') {
+            setPhoneError('');
+            setPhoneStats(null);
+            setStatsLoading(false);
+            return;
+        }
+        const normalized = orderFormInfo.phone.replace(/\D/g, '');
+        if (!normalized) {
+            setPhoneError('');
+            setPhoneStats(null);
+            return;
+        }
+
+        if (!/^\d{0,11}$/.test(normalized)) {
+            setPhoneError('Only digits are allowed');
+            setPhoneStats(null);
+            return;
+        }
+
+        if (normalized.length !== 11) {
+            setPhoneError('Phone number must be 11 digits');
+            setPhoneStats(null);
+            return;
+        }
+
+        setPhoneError('');
+        setStatsLoading(true);
+        const timer = setTimeout(async () => {
+            try {
+                const res = await getPhoneOrderStats(normalized);
+                const data = res.data || res;
+                setPhoneStats(data);
+            } catch (err) {
+                setPhoneStats(null);
+            } finally {
+                setStatsLoading(false);
+            }
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [orderFormInfo.phone, siteContent.show_order_success_rate]);
+
+    useEffect(() => {
+        if (!incompleteClientId) return;
+        const nameFilled = orderFormInfo.name.trim().length > 0;
+        const phoneFilled = /^\d{11}$/.test(orderFormInfo.phone.replace(/\D/g, ''));
+        const addressFilled = orderFormInfo.address.trim().length > 0;
+        const cityFilled = orderFormInfo.city.trim().length > 0;
+
+        if (!(nameFilled && phoneFilled && addressFilled && cityFilled)) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                await upsertIncompleteOrder({
+                    clientId: incompleteClientId,
+                    source: 'landing',
+                    name: orderFormInfo.name.trim(),
+                    phone: orderFormInfo.phone.replace(/\D/g, ''),
+                    email: '',
+                    address: orderFormInfo.address.trim(),
+                    city: orderFormInfo.city.trim(),
+                });
+            } catch (err) {
+                // ignore
+            }
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [incompleteClientId, orderFormInfo]);
+
 
     const scrollToOrder = () => {
         document.getElementById('order-form-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -92,8 +179,14 @@ const ProductLandingPage = () => {
         e.preventDefault();
         setOrderLoading(true);
         try {
+            if (isBelowThreshold) {
+                setOrderLoading(false);
+                alert(`Order blocked due to low delivery success rate (${successRate}%). Please contact customer support ${supportPhone}.`);
+                return;
+            }
+            const cleanedPhone = orderFormInfo.phone.replace(/\D/g, '');
             const payload = {
-                guestDetails: { name: orderFormInfo.name, phone: orderFormInfo.phone },
+                guestDetails: { name: orderFormInfo.name, phone: cleanedPhone },
                 fullAddress: `${orderFormInfo.address}, ${orderFormInfo.city}`,
                 items: [{ productId: product.id, quantity: quantity }],
                 paymentMethod,
@@ -111,6 +204,9 @@ const ProductLandingPage = () => {
                 const paymentData = paymentRes.data || paymentRes;
                 window.location.href = paymentData.paymentURL;
                 return;
+            }
+            if (incompleteClientId) {
+                clearIncompleteOrder(incompleteClientId, 'landing').catch(() => {});
             }
             setOrderSuccess(true);
             setQuantity(1);
@@ -136,6 +232,10 @@ const ProductLandingPage = () => {
         ? Math.round(((product.regular_price - product.sale_price) / product.regular_price) * 100)
         : 0;
     const plainDescription = product.description ? product.description.replace(/<[^>]*>/g, '') : '';
+    const minSuccessRate = Number(siteContent.min_order_success_rate || 0);
+    const supportPhone = siteContent.support_phone || siteContent.contact_phone || '';
+    const successRate = phoneStats?.successRate;
+    const isBelowThreshold = Number.isFinite(successRate) && minSuccessRate > 0 && successRate < minSuccessRate;
 
     return (
         <div className="landing-root min-h-screen text-slate-900 bg-[color:var(--bg)]">
@@ -422,7 +522,19 @@ const ProductLandingPage = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold uppercase text-Black-500 ml-1">Phone Number</label>
-                                    <input required value={orderFormInfo.phone} onChange={e => setOrderFormInfo({ ...orderFormInfo, phone: e.target.value })} placeholder="+880 1XXX-XXXXXX" className="w-full bg-slate-50 border border-slate-200 p-3 text-slate-500 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
+                                    <input required value={orderFormInfo.phone} onChange={e => setOrderFormInfo({ ...orderFormInfo, phone: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="01XXXXXXXXX" className="w-full bg-slate-50 border border-slate-200 p-3 text-slate-500 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
+                                    {phoneError && <p className="text-xs text-red-600 mt-1">{phoneError}</p>}
+                                    {siteContent.show_order_success_rate !== 'false' && statsLoading && !phoneError && <p className="text-xs text-slate-500 mt-1">Checking delivery success rate...</p>}
+                                    {siteContent.show_order_success_rate !== 'false' && phoneStats && !phoneError && (
+                                        <p className={`text-xs mt-1 ${isBelowThreshold ? 'text-red-600' : 'text-emerald-600'}`}>
+                                            Delivered: {phoneStats.delivered} | Cancelled: {phoneStats.cancelled} | Delivery Success Rate: {successRate === null ? 'N/A' : `${successRate}%`}
+                                        </p>
+                                    )}
+                                    {siteContent.show_order_success_rate !== 'false' && isBelowThreshold && (
+                                        <p className="text-xs text-red-600 mt-1">
+                                            Please contact customer support {supportPhone}.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 

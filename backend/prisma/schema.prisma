@@ -323,6 +323,21 @@ model SiteContent {
   updatedAt DateTime    @updatedAt
 }
 
+model IncompleteOrder {
+  id        Int      @id @default(autoincrement())
+  clientId  String
+  source    String
+  name      String
+  phone     String
+  email     String?
+  address   String
+  city      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, source])
+}
+
 model NewsletterSubscriber {
   id        Int      @id @default(autoincrement())
   email     String   @unique
