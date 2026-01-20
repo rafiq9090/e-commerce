@@ -25,9 +25,10 @@ const MobileMenu = ({
       
       <div 
         ref={mobileMenuRef}
-        className="md:hidden fixed top-0 right-0 h-full w-3/4 max-w-sm bg-white z-50 shadow-2xl"
+        className="md:hidden fixed top-0 right-0 h-full w-3/4 max-w-sm z-50 shadow-2xl"
+        style={{ backgroundColor: 'var(--menu-bg)' }}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-600 text-white">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 text-white" style={{ backgroundColor: 'var(--menu-hover)' }}>
           <h2 className="text-lg font-bold">Menu</h2>
           <button
             onClick={closeMobileMenu}
@@ -60,7 +61,7 @@ const MobileMenu = ({
           {Array.isArray(menuItems) && menuItems.length > 0 ? (
             menuItems.map((item) => {
               const isExternal = item.link?.startsWith('http');
-              const classes = "flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700";
+              const classes = "menu-link flex items-center gap-3 py-3 px-4 rounded-lg transition font-semibold";
               if (isExternal) {
                 return (
                   <a
@@ -89,7 +90,7 @@ const MobileMenu = ({
               <Link
                 to="/"
                 onClick={() => handleNavigation()}
-                className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
+                className="menu-link flex items-center gap-3 py-3 px-4 rounded-lg transition font-semibold"
               >
                 <Home size={20} className="text-blue-600" />
                 <span>Home</span>
@@ -98,7 +99,7 @@ const MobileMenu = ({
               <Link
                 to="/products"
                 onClick={() => handleNavigation()}
-                className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
+                className="menu-link flex items-center gap-3 py-3 px-4 rounded-lg transition font-semibold"
               >
                 <Package size={20} className="text-blue-600" />
                 <span>Products</span>
@@ -107,7 +108,7 @@ const MobileMenu = ({
               <Link
                 to="/track-order"
                 onClick={() => handleNavigation()}
-                className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
+                className="menu-link flex items-center gap-3 py-3 px-4 rounded-lg transition font-semibold"
               >
                 <Truck size={20} className="text-blue-600" />
                 <span>Track Order</span>

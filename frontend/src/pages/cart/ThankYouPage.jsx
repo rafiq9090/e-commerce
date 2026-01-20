@@ -253,6 +253,7 @@ const InvoicePDF = ({ order, orderItems, totalAmount, isGuest }) => (
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Phone:</Text>
+              
               <Text style={styles.infoValue}>{order.phone}</Text>
             </View>
             <View style={styles.infoRow}>
@@ -350,6 +351,7 @@ const ThankYouPage = () => {
       setLoading(true);
       try {
         const res = await trackOrderPublic(orderIdParam);
+        console.log('Fetched Order:', res);
         const payload = res.data || res;
         const normalizedOrder = {
           ...payload,
@@ -496,6 +498,7 @@ const ThankYouPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-gray-700">Phone:</span>
+
                 <span className="text-gray-900">{order.phone}</span>
               </div>
               <div className="flex justify-between">

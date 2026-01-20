@@ -5,7 +5,7 @@ import { getUserProfile } from "../../api/authApi";
 import { useCart } from "../../context/CartContext";
 import { getAllContent } from "../../api/contentApi";
 import { getMenuByName } from "../../api/menuApi";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, Search, ShoppingCart, User, Home, Package, Truck, Phone, Bell } from "lucide-react";
 
 // Import separate components
@@ -18,6 +18,7 @@ const Header = () => {
   const { isAuthenticated, logout, user } = useAuth();
   const { cartCount } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -149,8 +150,22 @@ const Header = () => {
     if (callback) callback();
   };
 
+  const menuThemeVars = {
+    '--menu-text': siteContent.menu_text_color || '#111827',
+    '--menu-hover': siteContent.menu_hover_color || '#2563eb',
+    '--menu-active': siteContent.menu_active_color || '#1d4ed8',
+    '--menu-bg': siteContent.menu_bg_color || '#ffffff',
+    '--menu-hover-bg': siteContent.menu_hover_bg || '#eff6ff',
+  };
+
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
+    <div className="menu-theme" style={menuThemeVars}>
+      <style>{`
+        .menu-theme .menu-link { color: var(--menu-text); }
+        .menu-theme .menu-link:hover { color: var(--menu-hover); background-color: var(--menu-hover-bg); }
+        .menu-theme .menu-link.menu-active { color: var(--menu-active); }
+      `}</style>
+    <header className="shadow-md sticky top-0 z-50" style={{ backgroundColor: 'var(--menu-bg)' }}>
       {/* Dynamic Top Navbar */}
       {/* Dynamic Top Navbar */}
       {siteContent.show_top_navbar === 'true' && (siteContent.top_bar_announcement || siteContent.contact_phone) && (
@@ -200,18 +215,19 @@ const Header = () => {
                   <a
                     key={item.id}
                     href={item.link}
-                    className="hover:text-blue-600 transition font-semibold"
+                    className="menu-link transition font-semibold px-1 py-0.5 rounded"
                     onClick={() => handleNavigation()}
                   >
                     {item.title}
                   </a>
                 );
               }
+              const isActive = location.pathname === (item.link || '/');
               return (
                 <Link
                   key={item.id}
                   to={item.link || '/'}
-                  className="hover:text-blue-600 transition font-semibold"
+                  className={`menu-link transition font-semibold px-1 py-0.5 rounded ${isActive ? 'menu-active' : ''}`}
                   onClick={() => handleNavigation()}
                 >
                   {item.title}
@@ -222,21 +238,21 @@ const Header = () => {
             <>
               <Link
                 to="/"
-                className="hover:text-blue-600 transition font-semibold"
+                className="menu-link transition font-semibold px-1 py-0.5 rounded"
                 onClick={() => handleNavigation()}
               >
                 Home
               </Link>
               <Link
                 to="/products"
-                className="hover:text-blue-600 transition font-semibold"
+                className="menu-link transition font-semibold px-1 py-0.5 rounded"
                 onClick={() => handleNavigation()}
               >
                 Products
               </Link>
               <Link
                 to="/track-order"
-                className="hover:text-blue-600 transition font-semibold"
+                className="menu-link transition font-semibold px-1 py-0.5 rounded"
                 onClick={() => handleNavigation()}
               >
                 Track Order
@@ -344,6 +360,7 @@ const Header = () => {
         handleNavigation={handleNavigation}
       />
     </header>
+    </div>
   );
 };
 

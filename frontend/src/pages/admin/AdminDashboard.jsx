@@ -24,7 +24,8 @@ import {
   Upload,
   Mail,
   Percent,
-  CreditCard
+  CreditCard,
+  Palette
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -185,6 +186,7 @@ const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [counts, setCounts] = useState({ products: 0, orders: 0 });
   const [incompleteCount, setIncompleteCount] = useState(0);
+  const [themeSettings, setThemeSettings] = useState({});
 
   const fetchNotificationCounts = async () => {
     try {
@@ -214,6 +216,29 @@ const AdminDashboard = () => {
     const interval = setInterval(fetchNotificationCounts, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const fetchTheme = async () => {
+      try {
+        const res = await getAllContent();
+        const data = res.data || res;
+        setThemeSettings(data && typeof data === 'object' ? data : {});
+      } catch (e) {
+        setThemeSettings({});
+      }
+    };
+    fetchTheme();
+  }, []);
+
+  const adminThemeVars = {
+    '--admin-sidebar-bg': themeSettings.admin_sidebar_bg || '#111827',
+    '--admin-sidebar-text': themeSettings.admin_sidebar_text || '#d1d5db',
+    '--admin-sidebar-hover-bg': themeSettings.admin_sidebar_hover_bg || '#1f2937',
+    '--admin-sidebar-active-bg': themeSettings.admin_sidebar_active_bg || '#111827',
+    '--admin-sidebar-active-text': themeSettings.admin_sidebar_active_text || '#ffffff',
+    '--admin-sidebar-badge-bg': themeSettings.admin_sidebar_badge_bg || '#ef4444',
+    '--admin-sidebar-badge-text': themeSettings.admin_sidebar_badge_text || '#ffffff',
+  };
 
   const fetchIncompleteCount = async () => {
     try {
@@ -269,9 +294,15 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-900 admin-theme" style={adminThemeVars}>
+      <style>{`
+        .admin-theme .sidebar-shell { background-color: var(--admin-sidebar-bg); }
+        .admin-theme .sidebar-item { color: var(--admin-sidebar-text); }
+        .admin-theme .sidebar-item:hover { background-color: var(--admin-sidebar-hover-bg); color: var(--admin-sidebar-text); }
+        .admin-theme .sidebar-item-active { background-color: var(--admin-sidebar-active-bg); color: var(--admin-sidebar-active-text); }
+      `}</style>
       {/* Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 ease-in-out flex flex-col shadow-xl z-20`}>
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} sidebar-shell text-white transition-all duration-300 ease-in-out flex flex-col shadow-xl z-20`}>
         <div className="h-16 flex items-center justify-center border-b border-gray-800">
           {isSidebarOpen ? <h1 className="text-xl font-bold tracking-wider">ADMIN PANEL</h1> : <span className="font-bold text-xl">AP</span>}
         </div>
@@ -294,7 +325,8 @@ const AdminDashboard = () => {
             onClick={() => handleTabChange('orders')}
             isOpen={isSidebarOpen}
             badge={counts.orders > 0 ? counts.orders : null}
-            badgeColor="bg-red-500"
+            badgeColor=""
+            badgeStyle={{ backgroundColor: 'var(--admin-sidebar-badge-bg)', color: 'var(--admin-sidebar-badge-text)' }}
           />
           <SidebarItem
             icon={<AlertTriangle size={20} />}
@@ -303,7 +335,8 @@ const AdminDashboard = () => {
             onClick={() => handleTabChange('incomplete')}
             isOpen={isSidebarOpen}
             badge={incompleteCount > 0 ? incompleteCount : null}
-            badgeColor="bg-orange-500"
+            badgeColor=""
+            badgeStyle={{ backgroundColor: 'var(--admin-sidebar-badge-bg)', color: 'var(--admin-sidebar-badge-text)' }}
           />
 
           <SidebarItem icon={<Layers size={20} />} label="Categories" active={activeTab === 'categories'} onClick={() => handleTabChange('categories')} isOpen={isSidebarOpen} />
@@ -348,21 +381,21 @@ const AdminDashboard = () => {
   );
 };
 
-const SidebarItem = ({ icon, label, active, onClick, isOpen, badge, badgeColor = 'bg-gray-600' }) => (
+const SidebarItem = ({ icon, label, active, onClick, isOpen, badge, badgeColor = 'bg-gray-600', badgeStyle }) => (
   <button
     onClick={onClick}
-    className={`relative flex items-center ${isOpen ? 'justify-start' : 'justify-center'} w-full p-3 rounded-lg transition-all duration-200 ${active ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+    className={`sidebar-item relative flex items-center ${isOpen ? 'justify-start' : 'justify-center'} w-full p-3 rounded-lg transition-all duration-200 ${active ? 'sidebar-item-active shadow-md' : ''}`}
   >
     {icon}
     {isOpen && <span className="ml-3 font-medium flex-1 text-left">{label}</span>}
     {badge && isOpen && (
-      <span className={`${badgeColor} text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto`}>
+      <span className={`${badgeColor} text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto`} style={badgeStyle}>
         {badge}
       </span>
     )}
     {/* Mini badge for collapsed state */}
     {badge && !isOpen && (
-      <span className={`absolute top-2 right-2 ${badgeColor} w-2 h-2 rounded-full border border-gray-900`}></span>
+      <span className={`absolute top-2 right-2 ${badgeColor} w-2 h-2 rounded-full border border-gray-900`} style={badgeStyle}></span>
     )}
   </button>
 );
@@ -1285,6 +1318,15 @@ const SettingsManager = () => {
     }
   };
 
+  const handleSaveThemeKey = async (key) => {
+    try {
+      await updateContent({ key, value: settings[key] || '', type: 'TEXT' });
+      alert('Color saved');
+    } catch (e) {
+      alert('Failed to save color');
+    }
+  };
+
   const handleToggleChange = async (key, checked) => {
     const val = checked ? 'true' : 'false';
     setSettings(prev => ({ ...prev, [key]: val }));
@@ -1395,6 +1437,47 @@ const SettingsManager = () => {
           <button onClick={() => handleSave('support_phone')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Support Phone</button>
         </div>
         <p className="text-xs text-gray-500 mt-4">If a customer&apos;s delivery success rate is below this threshold, new orders are blocked and a support message is shown.</p>
+      </div>
+
+      {/* Theme Colors */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <Palette className="text-purple-600" /> Theme Colors
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[
+            { key: 'menu_text_color', label: 'Menu Text Color', fallback: '#111827' },
+            { key: 'menu_hover_color', label: 'Menu Hover Color', fallback: '#2563eb' },
+            { key: 'menu_active_color', label: 'Menu Active Color', fallback: '#1d4ed8' },
+            { key: 'menu_bg_color', label: 'Menu Background Color', fallback: '#ffffff' },
+            { key: 'menu_hover_bg', label: 'Menu Hover Background', fallback: '#eff6ff' },
+            { key: 'admin_sidebar_bg', label: 'Admin Sidebar Background', fallback: '#111827' },
+            { key: 'admin_sidebar_text', label: 'Admin Sidebar Text', fallback: '#d1d5db' },
+            { key: 'admin_sidebar_hover_bg', label: 'Admin Hover Background', fallback: '#1f2937' },
+            { key: 'admin_sidebar_active_bg', label: 'Admin Active Background', fallback: '#111827' },
+            { key: 'admin_sidebar_active_text', label: 'Admin Active Text', fallback: '#ffffff' },
+            { key: 'admin_sidebar_badge_bg', label: 'Admin Badge Background', fallback: '#ef4444' },
+            { key: 'admin_sidebar_badge_text', label: 'Admin Badge Text', fallback: '#ffffff' },
+          ].map((field) => (
+            <div key={field.key} className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">{field.label}</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={settings[field.key] || field.fallback}
+                  onChange={e => handleChange(field.key, e.target.value)}
+                  className="h-10 w-20 border rounded"
+                />
+                <button
+                  onClick={() => handleSaveThemeKey(field.key)}
+                  className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Payment Methods */}
