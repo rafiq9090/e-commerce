@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { placeOrder } from '../../api/orderApi';
+import { createBkashPayment, createNagadPayment } from '../../api/paymentApi';
 import { getAllContent } from '../../api/contentApi';
 import {
   ShoppingBag,
@@ -154,6 +155,7 @@ const CheckoutPage = () => {
 
       console.log('Placing order with data:', orderData);
       const apiResponse = await placeOrder(orderData);
+      const order = apiResponse.data || apiResponse;
 
       // ✅ Cart Clearing Logic (Simplified & Robust)
       try {
@@ -168,9 +170,23 @@ const CheckoutPage = () => {
         console.warn('Frontend clear cart error:', e);
       }
 
+      if (paymentMethod === 'bKash') {
+        const paymentRes = await createBkashPayment(order.id);
+        const paymentData = paymentRes.data || paymentRes;
+        window.location.href = paymentData.paymentURL;
+        return;
+      }
+
+      if (paymentMethod === 'Nagad') {
+        const paymentRes = await createNagadPayment(order.id);
+        const paymentData = paymentRes.data || paymentRes;
+        window.location.href = paymentData.paymentURL;
+        return;
+      }
+
       navigate('/order-success', {
         state: {
-          order: apiResponse.data,
+          order,
           isGuest: !isAuthenticated,
           orderItems: orderItems,
           totalAmount: totalPrice,
@@ -305,7 +321,7 @@ const CheckoutPage = () => {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                      className="w-full text-slate-500 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
@@ -323,7 +339,7 @@ const CheckoutPage = () => {
                       </label>
                       <input
                         type="email"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                        className="w-full text-slate-500 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="your@email.com"
@@ -338,7 +354,7 @@ const CheckoutPage = () => {
                       </label>
                       <input
                         type="tel"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                        className="w-full px-4 py-3 text-slate-500 border-2 border-gray-200 rounded-xl  focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         required
@@ -365,7 +381,7 @@ const CheckoutPage = () => {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                      className="w-full text-slate-500 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
                       value={street}
                       onChange={(e) => setStreet(e.target.value)}
                       required
@@ -381,7 +397,7 @@ const CheckoutPage = () => {
                       </label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                        className="w-full text-slate-500 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
                         required
@@ -394,7 +410,7 @@ const CheckoutPage = () => {
                       </label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                        className="w-full text-slate-500 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
                         value={postalCode}
                         onChange={(e) => setPostalCode(e.target.value)}
                         placeholder="1200"
@@ -443,7 +459,7 @@ const CheckoutPage = () => {
                         />
                         <div>
                           <p className="font-semibold text-gray-900">bKash</p>
-                          <p className="text-sm text-gray-500">Send money to {siteContent.bkash_number || 'N/A'}</p>
+                          <p className="text-sm text-gray-500">Pay securely through bKash gateway</p>
                         </div>
                       </div>
                     </label>
@@ -460,7 +476,7 @@ const CheckoutPage = () => {
                         />
                         <div>
                           <p className="font-semibold text-gray-900">Nagad</p>
-                          <p className="text-sm text-gray-500">Send money to {siteContent.nagad_number || 'N/A'}</p>
+                          <p className="text-sm text-gray-500">Pay securely through Nagad gateway</p>
                         </div>
                       </div>
                     </label>

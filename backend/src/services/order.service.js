@@ -2,6 +2,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const PromotionService = require('./promotion.service');
+const ContentService = require('./content.service');
 const ActivityLogService = require('./activityLog.service');
 const transporter = require('../config/mailer');
 const BlocklistService = require('./blocklist.service');
@@ -70,10 +71,35 @@ class OrderService {
       customerEmail = guestDetails.email || null;
     }
 
+    if (!/^\d{11}$/.test(customerPhone || '')) {
+      throw new ApiError(400, 'Phone number must be 11 digits.');
+    }
+
     // --- Blocklist Check ---
     const isBlocked = await BlocklistService.isBlocked(ipAddress, customerPhone, customerEmail);
     if (isBlocked) {
       throw new ApiError(403, 'You fake cutomer please contact cutomer support');
+    }
+
+    // --- Delivery Success Rate Check (optional) ---
+    const content = await ContentService.getAllContent();
+    const minRate = Number(content.min_order_success_rate || 0);
+    if (minRate > 0) {
+      const [deliveredCount, cancelledCount] = await Promise.all([
+        prisma.order.count({ where: { customerPhone, status: 'DELIVERED' } }),
+        prisma.order.count({ where: { customerPhone, status: 'CANCELLED' } }),
+      ]);
+      const totalDecisions = deliveredCount + cancelledCount;
+      if (totalDecisions > 0) {
+        const successRate = (deliveredCount / totalDecisions) * 100;
+        if (successRate < minRate) {
+          const supportPhone = content.support_phone || content.contact_phone || '';
+          throw new ApiError(
+            403,
+            `Order blocked due to low delivery success rate (${successRate.toFixed(0)}%). Please contact customer support ${supportPhone}.`
+          );
+        }
+      }
     }
 
     // --- 3. Promotion Validation ---
@@ -323,6 +349,14 @@ class OrderService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  static async countOrdersByPhone(phone, status) {
+    const where = { customerPhone: phone };
+    if (status && status !== 'ALL') {
+      where.status = status;
+    }
+    return prisma.order.count({ where });
   }
 
 

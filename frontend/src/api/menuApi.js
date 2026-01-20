@@ -11,6 +11,17 @@ export const getAllMenus = async () => {
     }
 };
 
+// Get menu by name (Public)
+export const getMenuByName = async (name) => {
+    try {
+        const response = await apiClient.get(`/menus/${name}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching menu:", error);
+        throw error;
+    }
+};
+
 // Create a new menu
 export const createMenu = async (data) => {
     try {

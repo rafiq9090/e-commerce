@@ -81,6 +81,30 @@ const trackOrderSecure = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, order, 'Order details fetched successfully'));
 });
 
+const getPhoneOrderStats = asyncHandler(async (req, res) => {
+  const phone = String(req.query.phone || '').trim();
+  if (!/^\d{11}$/.test(phone)) {
+    throw new ApiError(400, 'Phone must be 11 digits.');
+  }
+
+  const [deliveredCount, cancelledCount, totalOrders] = await Promise.all([
+    OrderService.countOrdersByPhone(phone, 'DELIVERED'),
+    OrderService.countOrdersByPhone(phone, 'CANCELLED'),
+    OrderService.countOrdersByPhone(phone, 'ALL'),
+  ]);
+
+  const totalDecisions = deliveredCount + cancelledCount;
+  const successRate = totalDecisions > 0 ? Math.round((deliveredCount / totalDecisions) * 100) : null;
+
+  res.status(200).json(new ApiResponse(200, {
+    phone,
+    delivered: deliveredCount,
+    cancelled: cancelledCount,
+    totalOrders,
+    successRate,
+  }, 'Phone stats fetched'));
+});
+
 // --- Admin Controllers ---
 const getAllOrders = asyncHandler(async (req, res) => {
   const filters = req.query;
@@ -125,6 +149,7 @@ module.exports = {
   updateOrderStatus,
   trackOrderPublic,
   trackOrderSecure,
+  getPhoneOrderStats,
   cancelOrder,
   getOrderStatistics
 };

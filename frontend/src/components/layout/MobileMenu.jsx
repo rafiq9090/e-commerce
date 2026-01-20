@@ -6,6 +6,7 @@ const MobileMenu = ({
   mobileMenuOpen,
   mobileMenuRef,
   closeMobileMenu,
+  menuItems,
   isAuthenticated,
   profile,
   user,
@@ -56,32 +57,63 @@ const MobileMenu = ({
         )}
 
         <div className="flex flex-col p-4 space-y-2 overflow-y-auto h-[calc(100%-140px)]">
-          <Link
-            to="/"
-            onClick={() => handleNavigation()}
-            className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
-          >
-            <Home size={20} className="text-blue-600" />
-            <span>Home</span>
-          </Link>
+          {Array.isArray(menuItems) && menuItems.length > 0 ? (
+            menuItems.map((item) => {
+              const isExternal = item.link?.startsWith('http');
+              const classes = "flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700";
+              if (isExternal) {
+                return (
+                  <a
+                    key={item.id}
+                    href={item.link}
+                    onClick={() => handleNavigation()}
+                    className={classes}
+                  >
+                    <span>{item.title}</span>
+                  </a>
+                );
+              }
+              return (
+                <Link
+                  key={item.id}
+                  to={item.link || '/'}
+                  onClick={() => handleNavigation()}
+                  className={classes}
+                >
+                  <span>{item.title}</span>
+                </Link>
+              );
+            })
+          ) : (
+            <>
+              <Link
+                to="/"
+                onClick={() => handleNavigation()}
+                className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
+              >
+                <Home size={20} className="text-blue-600" />
+                <span>Home</span>
+              </Link>
 
-          <Link
-            to="/products"
-            onClick={() => handleNavigation()}
-            className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
-          >
-            <Package size={20} className="text-blue-600" />
-            <span>Products</span>
-          </Link>
+              <Link
+                to="/products"
+                onClick={() => handleNavigation()}
+                className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
+              >
+                <Package size={20} className="text-blue-600" />
+                <span>Products</span>
+              </Link>
 
-          <Link
-            to="/track-order"
-            onClick={() => handleNavigation()}
-            className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
-          >
-            <Truck size={20} className="text-blue-600" />
-            <span>Track Order</span>
-          </Link>
+              <Link
+                to="/track-order"
+                onClick={() => handleNavigation()}
+                className="flex items-center gap-3 py-3 px-4 hover:bg-blue-50 rounded-lg transition font-semibold text-gray-700"
+              >
+                <Truck size={20} className="text-blue-600" />
+                <span>Track Order</span>
+              </Link>
+            </>
+          )}
 
           {isAuthenticated ? (
             <>

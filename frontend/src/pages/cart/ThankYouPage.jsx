@@ -1,6 +1,8 @@
 // pages/OrderSuccessPage.js
-import { useLocation, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, Link, useSearchParams } from 'react-router-dom';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { trackOrderPublic } from '../../api/orderApi';
 
 // Register fonts
 Font.register({
@@ -188,6 +190,11 @@ const styles = StyleSheet.create({
   },
 });
 
+const getItemPrice = (item) => {
+  const price = item?.unitPrice ?? item?.product?.sale_price ?? item?.product?.regular_price ?? 0;
+  return Number(price);
+};
+
 // PDF Document Component - Single Page
 const InvoicePDF = ({ order, orderItems, totalAmount, isGuest }) => (
   <Document>
@@ -272,11 +279,11 @@ const InvoicePDF = ({ order, orderItems, totalAmount, isGuest }) => (
             <View key={index} style={styles.tableRow}>
               <Text style={styles.tableColProduct}>{item.product.name}</Text>
               <Text style={styles.tableCol}>
-                {parseFloat(item.product.sale_price || item.product.regular_price).toFixed(2)}
+                {getItemPrice(item).toFixed(2)}
               </Text>
               <Text style={styles.tableCol}>{item.quantity}</Text>
               <Text style={styles.tableCol}>
-                {((item.product.sale_price || item.product.regular_price) * item.quantity).toFixed(2)}
+                {(getItemPrice(item) * item.quantity).toFixed(2)}
               </Text>
             </View>
           ))}
@@ -327,7 +334,54 @@ const InvoicePDF = ({ order, orderItems, totalAmount, isGuest }) => (
 
 const ThankYouPage = () => {
   const location = useLocation();
-  const { order, isGuest, orderItems, totalAmount } = location.state || {};
+  const [searchParams] = useSearchParams();
+  const [order, setOrder] = useState(location.state?.order || null);
+  const [orderItems, setOrderItems] = useState(location.state?.orderItems || null);
+  const [totalAmount, setTotalAmount] = useState(Number(location.state?.totalAmount ?? 0));
+  const [isGuest, setIsGuest] = useState(location.state?.isGuest || false);
+  const [loading, setLoading] = useState(false);
+
+  const orderIdParam = searchParams.get('orderId');
+  const paymentStatus = searchParams.get('payment');
+
+  useEffect(() => {
+    const fetchOrder = async () => {
+      if (order || !orderIdParam) return;
+      setLoading(true);
+      try {
+        const res = await trackOrderPublic(orderIdParam);
+        const payload = res.data || res;
+        const normalizedOrder = {
+          ...payload,
+          paymentMethod: payload.payment?.paymentMethod || payload.paymentMethod,
+          phone: payload.customerPhone || payload.phone,
+          guestDetails: payload.guestDetails || {
+            name: payload.customerName,
+            email: payload.customerEmail,
+          },
+          fullAddress: payload.fullAddress || payload.address?.fullAddress,
+        };
+        setOrder(normalizedOrder);
+        setOrderItems(payload.orderItems || []);
+        setTotalAmount(Number(payload.totalAmount || 0));
+        setIsGuest(!payload.userId);
+      } catch (err) {
+        setOrder(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrder();
+  }, [order, orderIdParam]);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 max-w-4xl text-center">
+        <p className="text-gray-600 font-semibold">Loading your order...</p>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -343,6 +397,17 @@ const ThankYouPage = () => {
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
+      {paymentStatus === 'failed' && (
+        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl font-semibold">
+          Payment failed or cancelled. You can retry payment from your order history or contact support.
+        </div>
+      )}
+      {paymentStatus === 'success' && (
+        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl font-semibold">
+          Payment completed successfully. Thank you!
+        </div>
+      )}
+
       {/* Invoice Action */}
       <div className="flex justify-end mb-6">
         <PDFDownloadLink
@@ -404,7 +469,7 @@ const ThankYouPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-gray-700">Total Amount:</span>
-                <span className="text-green-600 font-bold">{totalAmount?.toFixed(2) || '0.00'} BDT</span>
+                <span className="text-green-600 font-bold">{Number(totalAmount || 0).toFixed(2)} BDT</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-gray-700">Payment Method:</span>
@@ -466,7 +531,7 @@ const ThankYouPage = () => {
                   <span className="font-medium text-gray-800">{item.product.name}</span>
                 </div>
                 <div className="text-right self-center">
-                  <span className="text-gray-700">{parseFloat(item.product.sale_price || item.product.regular_price).toFixed(2)} BDT</span>
+                  <span className="text-gray-700">{getItemPrice(item).toFixed(2)} BDT</span>
                 </div>
                 <div className="text-right self-center">
                   <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-medium">
@@ -475,7 +540,7 @@ const ThankYouPage = () => {
                 </div>
                 <div className="text-right self-center">
                   <span className="font-semibold text-gray-900">
-                    {((item.product.sale_price || item.product.regular_price) * item.quantity).toFixed(2)} BDT
+                    {(getItemPrice(item) * item.quantity).toFixed(2)} BDT
                   </span>
                 </div>
               </div>

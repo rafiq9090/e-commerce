@@ -38,6 +38,7 @@ import { getAllBlocked, addToBlocklist, removeFromBlocklist } from '../../api/bl
 import { getNewsletterSubscribers, deleteNewsletterSubscriber, sendProductNewsletter, sendPromotionNewsletter } from '../../api/newsletterApi';
 import { getPromotions, createPromotion, deletePromotion } from '../../api/promotionApi';
 import { registerAdmin, getRoles, getAdmins } from '../../api/adminApi';
+import { createSteadfastOrder, createSteadfastBulkOrders } from '../../api/courierApi';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -520,11 +521,12 @@ const MenusManager = () => {
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <h4 className="text-sm font-bold mb-2">Add Item</h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                    <input placeholder="Title" value={newItemData.title} onChange={e => setNewItemData({ ...newItemData, title: e.target.value })} className="border p-1 rounded text-sm" />
-                    <input placeholder="Link (/path)" value={newItemData.link} onChange={e => setNewItemData({ ...newItemData, link: e.target.value })} className="border p-1 rounded text-sm" />
-                    <input type="number" placeholder="Order" value={newItemData.order} onChange={e => setNewItemData({ ...newItemData, order: e.target.value })} className="border p-1 rounded text-sm" />
+                    <input placeholder="Title (menu text)" value={newItemData.title} onChange={e => setNewItemData({ ...newItemData, title: e.target.value })} className="border p-1 rounded text-sm" />
+                    <input placeholder="Link (/path) e.g. /products" value={newItemData.link} onChange={e => setNewItemData({ ...newItemData, link: e.target.value })} className="border p-1 rounded text-sm" />
+                    <input type="number" placeholder="Position (0 = first)" value={newItemData.order} onChange={e => setNewItemData({ ...newItemData, order: e.target.value })} className="border p-1 rounded text-sm" />
                     <button onClick={() => handleAddItem(menu.id)} className="bg-green-600 text-white rounded text-sm hover:bg-green-700">Add</button>
                   </div>
+                  <p className="text-xs text-gray-400 mt-2">Position controls order: 0 shows first, 1 second, 2 third.</p>
                 </div>
               </div>
             )}
@@ -1230,6 +1232,7 @@ const SettingsManager = () => {
     const payload = [
       { key: 'nagad_env', value: settings.nagad_env || 'sandbox', type: 'TEXT' },
       { key: 'nagad_merchant_id', value: settings.nagad_merchant_id || '', type: 'TEXT' },
+      { key: 'nagad_merchant_number', value: settings.nagad_merchant_number || '', type: 'TEXT' },
       { key: 'nagad_merchant_private_key', value: settings.nagad_merchant_private_key || '', type: 'TEXT' },
       { key: 'nagad_public_key', value: settings.nagad_public_key || '', type: 'TEXT' }
     ];
@@ -1394,6 +1397,10 @@ const SettingsManager = () => {
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Merchant ID</label>
             <input value={settings['nagad_merchant_id'] || ''} onChange={e => handleChange('nagad_merchant_id', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Merchant Number (Account)</label>
+            <input value={settings['nagad_merchant_number'] || ''} onChange={e => handleChange('nagad_merchant_number', e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Merchant Private Key</label>
@@ -2089,6 +2096,9 @@ const OrdersManager = () => {
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [sending, setSending] = useState(false);
+  const selectableOrders = orders.filter(o => !o.steadfastTrackingCode);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -2097,7 +2107,9 @@ const OrdersManager = () => {
         status: filterStatus || undefined,
         search: searchQuery || undefined
       });
-      setOrders(res.data || res);
+      const nextOrders = res.data || res;
+      setOrders(nextOrders);
+      setSelectedOrderIds(prev => prev.filter(id => nextOrders.some(o => o.id === id && !o.steadfastTrackingCode)));
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
@@ -2120,6 +2132,48 @@ const OrdersManager = () => {
 
   const handleRowClick = (order) => {
     setSelectedOrder(order);
+  };
+
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedOrderIds(selectableOrders.map(o => o.id));
+    } else {
+      setSelectedOrderIds([]);
+    }
+  };
+
+  const toggleSelectOrder = (orderId, checked) => {
+    setSelectedOrderIds(prev => {
+      if (checked) return prev.includes(orderId) ? prev : [...prev, orderId];
+      return prev.filter(id => id !== orderId);
+    });
+  };
+
+  const handleSendSteadfast = async (orderId) => {
+    setSending(true);
+    try {
+      await createSteadfastOrder(orderId);
+      fetchOrders();
+      setSelectedOrderIds(prev => prev.filter(id => id !== orderId));
+    } catch (e) {
+      alert(e?.message || e?.response?.data?.message || 'Failed to send order to Steadfast');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendSteadfastBulk = async () => {
+    if (selectedOrderIds.length === 0) return;
+    setSending(true);
+    try {
+      await createSteadfastBulkOrders(selectedOrderIds);
+      fetchOrders();
+      setSelectedOrderIds([]);
+    } catch (e) {
+      alert(e?.message || e?.response?.data?.message || 'Failed to send orders to Steadfast');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handlePrintInvoice = (order) => {
@@ -2275,6 +2329,13 @@ const OrdersManager = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Orders Tracking</h2>
         <div className="flex gap-2">
+          <button
+            onClick={handleSendSteadfastBulk}
+            disabled={sending || selectedOrderIds.length === 0}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium border ${selectedOrderIds.length === 0 || sending ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-orange-600 text-white border-orange-600 hover:bg-orange-700'}`}
+          >
+            {sending ? 'Sending...' : `Send Selected (${selectedOrderIds.length})`}
+          </button>
           <input
             type="text"
             placeholder="Search ID, Name, Phone..."
@@ -2299,6 +2360,15 @@ const OrdersManager = () => {
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="p-4 w-10">
+                <input
+                  type="checkbox"
+                  checked={selectableOrders.length > 0 && selectedOrderIds.length === selectableOrders.length}
+                  disabled={selectableOrders.length === 0}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </th>
               <th className="p-4">ID</th>
               <th className="p-4">Customer</th>
               <th className="p-4">Total</th>
@@ -2313,6 +2383,15 @@ const OrdersManager = () => {
                 onClick={() => handleRowClick(o)}
                 className="cursor-pointer hover:bg-gray-50 transition-colors"
               >
+                <td className="p-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedOrderIds.includes(o.id)}
+                    disabled={!!o.steadfastTrackingCode}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => toggleSelectOrder(o.id, e.target.checked)}
+                  />
+                </td>
                 <td className="p-4">#{o.id}</td>
                 <td className="p-4">{o.customerName}<br /><span className="text-xs text-gray-500">{o.customerEmail}</span></td>
                 <td className="p-4">৳{o.totalAmount}</td>
@@ -2327,7 +2406,23 @@ const OrdersManager = () => {
                   </select>
                 </td>
                 <td className="p-4 text-right">
-                  <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-full" title="View Details">
+                  {o.steadfastTrackingCode ? (
+                    <span className="text-xs font-semibold text-green-700">Tracking: {o.steadfastTrackingCode}</span>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSendSteadfast(o.id);
+                      }}
+                      disabled={sending}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-60"
+                      title="Send to Steadfast"
+                    >
+                      <Truck size={14} />
+                      Send
+                    </button>
+                  )}
+                  <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-full ml-2" title="View Details">
                     <ExternalLink size={16} />
                   </button>
                 </td>

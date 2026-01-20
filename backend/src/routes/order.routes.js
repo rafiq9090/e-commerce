@@ -8,6 +8,7 @@ const {
   updateOrderStatus,
   trackOrderPublic,
   trackOrderSecure,
+  getPhoneOrderStats,
   cancelOrder,
   getOrderStatistics
 } = require('../controllers/order.controller');
@@ -17,6 +18,7 @@ const router = express.Router();
 
 // PUBLIC ROUTES
 router.get('/track/:orderId', trackOrderPublic);
+router.get('/phone-stats', getPhoneOrderStats);
 router.post('/track/secure', trackOrderSecure);
 
 // CUSTOMER ROUTES (Guest + Authenticated)

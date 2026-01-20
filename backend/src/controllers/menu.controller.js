@@ -1,5 +1,6 @@
 const MenuService = require('../services/menu.service');
 const ApiResponse = require('../utils/ApiResponse');
+const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
 // public controllers
@@ -26,13 +27,19 @@ const addMenuItem = asyncHandler(async (req, res) => {
 });
 
 const updateMenuItem = asyncHandler(async (req, res) => {
-  const { itemId } = req.params;
+  const itemId = Number(req.params.itemId);
+  if (!Number.isInteger(itemId)) {
+    throw new ApiError(400, 'Invalid menu item id');
+  }
   const item = await MenuService.updateMenuItem(itemId, req.body);
   res.status(200).json(new ApiResponse(200, item, 'Menu item updated successfully'));
 });
 
 const deleteMenuItem = asyncHandler(async (req, res) => {
-  const { itemId } = req.params;
+  const itemId = Number(req.params.itemId);
+  if (!Number.isInteger(itemId)) {
+    throw new ApiError(400, 'Invalid menu item id');
+  }
   await MenuService.deleteMenuItem(itemId);
   res.status(204).send(); // No content response
 });

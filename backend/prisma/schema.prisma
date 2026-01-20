@@ -253,6 +253,10 @@ model Order {
   payment              PaymentDetail?
   history              OrderHistory[]
   ipAddress            String?
+  steadfastConsignmentId String?
+  steadfastTrackingCode  String?
+  steadfastStatus        String?
+  steadfastSentAt        DateTime?
 }
 model OrderHistory {
   id        Int         @id @default(autoincrement())

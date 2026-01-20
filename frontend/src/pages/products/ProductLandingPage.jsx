@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getProductBySlug } from '../../api/productApi';
 import { getAllContent } from '../../api/contentApi';
 import { placeGuestOrder } from '../../api/orderApi';
+import { createBkashPayment, createNagadPayment } from '../../api/paymentApi';
 import { ShoppingCart, Check, Star, ShieldCheck, Truck, Clock, Menu, X, ChevronDown, Award, Heart, ThumbsUp, CreditCard, Banknote } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import Footer from '../../components/layout/Footer';
@@ -97,7 +98,20 @@ const ProductLandingPage = () => {
                 items: [{ productId: product.id, quantity: quantity }],
                 paymentMethod,
             };
-            await placeGuestOrder(payload);
+            const response = await placeGuestOrder(payload);
+            const order = response.data || response;
+            if (paymentMethod === 'bKash') {
+                const paymentRes = await createBkashPayment(order.id);
+                const paymentData = paymentRes.data || paymentRes;
+                window.location.href = paymentData.paymentURL;
+                return;
+            }
+            if (paymentMethod === 'Nagad') {
+                const paymentRes = await createNagadPayment(order.id);
+                const paymentData = paymentRes.data || paymentRes;
+                window.location.href = paymentData.paymentURL;
+                return;
+            }
             setOrderSuccess(true);
             setQuantity(1);
         } catch (err) {
@@ -403,23 +417,23 @@ const ProductLandingPage = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold uppercase text-slate-500 ml-1">Full Name</label>
-                                    <input required value={orderFormInfo.name} onChange={e => setOrderFormInfo({ ...orderFormInfo, name: e.target.value })} placeholder="Enter your name" className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
+                                    <label className="text-xs font-bold uppercase text-Black-500 ml-1">Full Name</label>
+                                    <input required value={orderFormInfo.name} onChange={e => setOrderFormInfo({ ...orderFormInfo, name: e.target.value })} placeholder="Enter your full name" className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-500  focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold uppercase text-slate-500 ml-1">Phone Number</label>
-                                    <input required value={orderFormInfo.phone} onChange={e => setOrderFormInfo({ ...orderFormInfo, phone: e.target.value })} placeholder="Enter your number" className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
+                                    <label className="text-xs font-bold uppercase text-Black-500 ml-1">Phone Number</label>
+                                    <input required value={orderFormInfo.phone} onChange={e => setOrderFormInfo({ ...orderFormInfo, phone: e.target.value })} placeholder="+880 1XXX-XXXXXX" className="w-full bg-slate-50 border border-slate-200 p-3 text-slate-500 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-xs font-bold uppercase text-slate-500 ml-1">Full Address</label>
-                                <textarea required value={orderFormInfo.address} onChange={e => setOrderFormInfo({ ...orderFormInfo, address: e.target.value })} placeholder="House, Road, Area..." className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl h-24 focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition resize-none" />
+                                <label className="text-xs font-bold uppercase text-Black-500 ml-1">Full Address</label>
+                                <textarea required value={orderFormInfo.address} onChange={e => setOrderFormInfo({ ...orderFormInfo, address: e.target.value })} placeholder="House, Road, Area..." className="w-full bg-slate-50 border border-slate-200 text-slate-500 p-3 rounded-xl h-24 focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition resize-none" />
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-xs font-bold uppercase text-slate-500 ml-1">City / District</label>
-                                <input required value={orderFormInfo.city} onChange={e => setOrderFormInfo({ ...orderFormInfo, city: e.target.value })} placeholder="Dhaka" className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
+                                <label className="text-xs font-bold uppercase text-Black-500 ml-1">City / District</label>
+                                <input required value={orderFormInfo.city} onChange={e => setOrderFormInfo({ ...orderFormInfo, city: e.target.value })} placeholder="City name" className="w-full bg-slate-50 border border-slate-200 text-slate-500 p-3 rounded-xl focus:ring-2 focus:ring-[color:var(--accent)] outline-none transition" />
                             </div>
 
                             <div className="space-y-3">
@@ -450,7 +464,7 @@ const ProductLandingPage = () => {
                                             />
                                             <div>
                                                 <p className="font-bold text-slate-700">bKash</p>
-                                                <p className="text-xs text-slate-500">Send money to {siteContent.bkash_number || 'N/A'}</p>
+                                                <p className="text-xs text-slate-500">Pay securely through bKash gateway</p>
                                             </div>
                                         </div>
                                     </label>
@@ -467,7 +481,7 @@ const ProductLandingPage = () => {
                                             />
                                             <div>
                                                 <p className="font-bold text-slate-700">Nagad</p>
-                                                <p className="text-xs text-slate-500">Send money to {siteContent.nagad_number || 'N/A'}</p>
+                                                <p className="text-xs text-slate-500">Pay securely through Nagad gateway</p>
                                             </div>
                                         </div>
                                     </label>

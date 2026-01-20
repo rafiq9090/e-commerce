@@ -19,6 +19,8 @@ const activityLogRoutes = require('./activityLog.routes');
 const contentRoutes = require('./content.routes');
 const newsletterRoutes = require('./newsletter.routes');
 const uploadRoutes = require('./upload.routes');
+const paymentRoutes = require('./payment.routes');
+const courierRoutes = require('./courier.routes');
 
 
 // Use module routers
@@ -38,5 +40,7 @@ router.use('/activity-log', activityLogRoutes);
 router.use('/content', contentRoutes);
 router.use('/newsletter', newsletterRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/courier', courierRoutes);
 
 module.exports = router;

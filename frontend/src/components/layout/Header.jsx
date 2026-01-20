@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { getUserProfile } from "../../api/authApi";
 import { useCart } from "../../context/CartContext";
 import { getAllContent } from "../../api/contentApi";
+import { getMenuByName } from "../../api/menuApi";
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, X, Search, ShoppingCart, User, Home, Package, Truck, Phone, Bell } from "lucide-react";
 
@@ -23,6 +24,7 @@ const Header = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [profile, setProfile] = useState(null);
   const [siteContent, setSiteContent] = useState({});
+  const [menuItems, setMenuItems] = useState([]);
 
   const userMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
@@ -70,6 +72,27 @@ const Header = () => {
       fetchProfile();
     }
   }, [isAuthenticated]);
+
+  // Fetch Public Menu (Site)
+  useEffect(() => {
+    const fetchMenu = async () => {
+      const contentName = (siteContent.header_menu_name || siteContent.main_menu || '').trim();
+      const menuName = contentName || 'main-menu';
+      try {
+        const res = await getMenuByName(menuName);
+        const payload = res.data || res;
+        const menu = payload.data || payload;
+        const items = Array.isArray(menu?.items) ? menu.items : [];
+        const sortedItems = [...items].sort((a, b) => a.order - b.order);
+        setMenuItems(sortedItems);
+      } catch (error) {
+        setMenuItems([]);
+        console.error("Error fetching menu:", error);
+      }
+    };
+
+    fetchMenu();
+  }, [siteContent.header_menu_name, siteContent.main_menu]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -169,27 +192,57 @@ const Header = () => {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center space-x-6">
-          <Link
-            to="/"
-            className="hover:text-blue-600 transition font-semibold"
-            onClick={() => handleNavigation()}
-          >
-            Home
-          </Link>
-          <Link
-            to="/products"
-            className="hover:text-blue-600 transition font-semibold"
-            onClick={() => handleNavigation()}
-          >
-            Products
-          </Link>
-          <Link
-            to="/track-order"
-            className="hover:text-blue-600 transition font-semibold"
-            onClick={() => handleNavigation()}
-          >
-            Track Order
-          </Link>
+          {menuItems.length > 0 ? (
+            menuItems.map((item) => {
+              const isExternal = item.link?.startsWith('http');
+              if (isExternal) {
+                return (
+                  <a
+                    key={item.id}
+                    href={item.link}
+                    className="hover:text-blue-600 transition font-semibold"
+                    onClick={() => handleNavigation()}
+                  >
+                    {item.title}
+                  </a>
+                );
+              }
+              return (
+                <Link
+                  key={item.id}
+                  to={item.link || '/'}
+                  className="hover:text-blue-600 transition font-semibold"
+                  onClick={() => handleNavigation()}
+                >
+                  {item.title}
+                </Link>
+              );
+            })
+          ) : (
+            <>
+              <Link
+                to="/"
+                className="hover:text-blue-600 transition font-semibold"
+                onClick={() => handleNavigation()}
+              >
+                Home
+              </Link>
+              <Link
+                to="/products"
+                className="hover:text-blue-600 transition font-semibold"
+                onClick={() => handleNavigation()}
+              >
+                Products
+              </Link>
+              <Link
+                to="/track-order"
+                className="hover:text-blue-600 transition font-semibold"
+                onClick={() => handleNavigation()}
+              >
+                Track Order
+              </Link>
+            </>
+          )}
 
           {/* Cart */}
           <Link
@@ -282,6 +335,7 @@ const Header = () => {
         mobileMenuOpen={mobileMenuOpen}
         mobileMenuRef={mobileMenuRef}
         closeMobileMenu={closeMobileMenu}
+        menuItems={menuItems}
         isAuthenticated={isAuthenticated}
         profile={profile}
         user={user}

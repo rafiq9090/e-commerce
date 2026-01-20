@@ -100,6 +100,7 @@ async function main() {
       { key: 'todays_deals_body', value: 'Discover limited-time discounts across electronics, fashion, and home essentials.\n\nCheck back daily for new deals and flash sales curated just for you.', type: 'TEXT' },
       { key: 'contact_us_title', value: 'Contact Us', type: 'TEXT' },
       { key: 'contact_us_body', value: 'Have a question or need help with an order? Reach out anytime and our support team will respond within 24 hours.', type: 'TEXT' },
+      { key: 'steadfast_base_url', value: 'https://portal.packzy.com/api/v1', type: 'TEXT' },
       { key: 'newsletter_title', value: 'Subscribe to Our Newsletter', type: 'TEXT' },
       { key: 'newsletter_description', value: 'Get the latest updates on new products and upcoming sales.', type: 'TEXT' },
       { key: 'newsletter_from_email', value: 'no-reply@deshshera.com', type: 'TEXT' },
@@ -125,6 +126,7 @@ async function main() {
       { key: 'bkash_password', value: '', type: 'TEXT' },
       { key: 'nagad_env', value: 'sandbox', type: 'TEXT' },
       { key: 'nagad_merchant_id', value: '', type: 'TEXT' },
+      { key: 'nagad_merchant_number', value: '', type: 'TEXT' },
       { key: 'nagad_merchant_private_key', value: '', type: 'TEXT' },
       { key: 'nagad_public_key', value: '', type: 'TEXT' }
     ]
