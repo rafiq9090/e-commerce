@@ -351,12 +351,16 @@ const ThankYouPage = () => {
       setLoading(true);
       try {
         const res = await trackOrderPublic(orderIdParam);
-        console.log('Fetched Order:', res);
         const payload = res.data || res;
+        const derivedPhone =
+          payload.customerPhone ||
+          payload.phone ||
+          payload.address?.phone ||
+          payload.guestDetails?.phone;
         const normalizedOrder = {
           ...payload,
           paymentMethod: payload.payment?.paymentMethod || payload.paymentMethod,
-          phone: payload.customerPhone || payload.phone,
+          phone: derivedPhone,
           guestDetails: payload.guestDetails || {
             name: payload.customerName,
             email: payload.customerEmail,
