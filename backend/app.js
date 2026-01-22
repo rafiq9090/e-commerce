@@ -24,8 +24,13 @@ app.use(morgan('dev'));
 
 // 1. Set up CORS correctly HERE, at the top
 // This is the ONLY app.use(cors()) you should have.
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: 'http://localhost:5173', // Your frontend URL
+  origin: corsOrigins,
   credentials: true // This allows cookies
 }));
 
