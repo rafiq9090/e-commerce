@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getProductBySlug, getRelatedProducts } from "../../api/productApi";
 import { useCart } from "../../context/CartContext";
@@ -35,24 +35,33 @@ const ProductDetailPage = () => {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [error, setError] = useState(null);
+  const breadcrumbRef = useRef(null);
+  const [showBreadcrumbFade, setShowBreadcrumbFade] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
+        setError(null);
+        setSelectedImage(null);
         const response = await getProductBySlug(slug);
-        console.log("Product Data:", response.data);
-        setProduct(response.data);
-        if (response.data.images && response.data.images.length > 0) {
-          setSelectedImage(response.data.images[0].url);
+        const apiData = response?.data ?? response;
+        const productData = apiData?.data ?? apiData;
+        console.log("Product Data:", productData);
+        setProduct(productData);
+        if (productData?.images && productData.images.length > 0) {
+          setSelectedImage(productData.images[0].url);
         }
 
         // Fetch related products
-        if (response.data.id) {
-          fetchRelatedProducts(response.data.id);
+        if (productData?.id) {
+          fetchRelatedProducts(productData.id);
         }
       } catch (error) {
         console.error("Failed to load product", error);
+        setProduct(null);
+        setError(error?.message || "Failed to load product");
       } finally {
         setLoading(false);
       }
@@ -60,12 +69,37 @@ const ProductDetailPage = () => {
     fetchProduct();
   }, [slug]);
 
+  useEffect(() => {
+    const el = breadcrumbRef.current;
+    if (!el) return;
+
+    const updateFade = () => {
+      const hasOverflow = el.scrollWidth > el.clientWidth + 1;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      setShowBreadcrumbFade(hasOverflow && !atEnd);
+    };
+
+    updateFade();
+    const onScroll = () => requestAnimationFrame(updateFade);
+    const onResize = () => updateFade();
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [product?.name, loading]);
+
   const fetchRelatedProducts = async (productId) => {
     try {
       setLoadingRelated(true);
       const response = await getRelatedProducts(productId, 8);
-      console.log("Related Products:", response.data);
-      setRelatedProducts(response.data || []);
+      const apiData = response?.data ?? response;
+      const relatedData = apiData?.data ?? apiData;
+      console.log("Related Products:", relatedData);
+      setRelatedProducts(Array.isArray(relatedData) ? relatedData : []);
     } catch (error) {
       console.error("Failed to load related products", error);
       setRelatedProducts([]);
@@ -182,7 +216,9 @@ const ProductDetailPage = () => {
             <Package className="w-10 h-10 text-red-600" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Product Not Found</h2>
-          <p className="text-gray-600 mb-8 text-lg">The product you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-600 mb-8 text-lg">
+            {error || "The product you're looking for doesn't exist or has been removed."}
+          </p>
           <button
             onClick={() => navigate('/products')}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-full hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg font-semibold"
@@ -219,20 +255,26 @@ const ProductDetailPage = () => {
 
       <div className="container mx-auto p-4 md:p-8">
         {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-sm mb-8 bg-white rounded-full px-6 py-3 shadow-sm inline-flex">
+        <nav
+          ref={breadcrumbRef}
+          className="relative flex items-center gap-2 text-xs sm:text-sm mb-6 sm:mb-8 bg-white rounded-2xl sm:rounded-full px-4 sm:px-6 py-2.5 sm:py-3 shadow-sm flex-nowrap w-full max-w-full overflow-x-auto whitespace-nowrap scrollbar-hide"
+        >
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors font-medium"
+            className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors font-medium whitespace-nowrap"
           >
             <ArrowLeft size={16} />
             Back
           </button>
           <ChevronRight size={16} className="text-gray-400" />
-          <Link to="/" className="text-gray-600 hover:text-blue-600 transition-colors">Home</Link>
+          <Link to="/" className="text-gray-600 hover:text-blue-600 transition-colors whitespace-nowrap">Home</Link>
           <ChevronRight size={16} className="text-gray-400" />
-          <Link to="/products" className="text-gray-600 hover:text-blue-600 transition-colors">Products</Link>
+          <Link to="/products" className="text-gray-600 hover:text-blue-600 transition-colors whitespace-nowrap">Products</Link>
           <ChevronRight size={16} className="text-gray-400" />
-          <span className="text-gray-900 font-semibold truncate max-w-xs">{product.name}</span>
+          <span className="text-gray-900 font-semibold truncate max-w-[12rem] sm:max-w-xs">{product.name}</span>
+          {showBreadcrumbFade && (
+            <span className="pointer-events-none absolute right-0 top-0 h-full w-6 sm:w-8 bg-gradient-to-l from-white to-transparent" />
+          )}
         </nav>
 
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">

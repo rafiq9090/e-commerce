@@ -15,7 +15,8 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/${GHCR_OWNER}/e-commerce-backend:${IMAGE_TAG}
+    build:
+      context: ./backend
     container_name: ecommerce-backend
     restart: unless-stopped
     environment:
@@ -31,7 +32,8 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ghcr.io/${GHCR_OWNER}/e-commerce-frontend:${IMAGE_TAG}
+    build:
+      context: ./frontend
     container_name: ecommerce-frontend
     restart: unless-stopped
     ports:

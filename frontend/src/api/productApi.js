@@ -45,7 +45,7 @@ export const searchProducts = async (query, filters = {}) => {
   } catch (error) {
     console.error("❌ Search API Error:");
     console.error("❌ Status:", error.response?.status);
-    console.error("❌ Response:", error.response?.data);
+    console.error("❌ Response:", error.response?.data);                                                                                                                                                                                                                                                                                                          
     console.error("❌ Message:", error.response?.data?.message);
 
     throw error;

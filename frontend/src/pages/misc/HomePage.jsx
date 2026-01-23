@@ -14,7 +14,7 @@ const HomePage = () => {
         setLoading(true);
         setError(null);
         
-        const response = await getProducts();
+        const response = await getProducts({ limit: 8 });
         
         // ✅ Handle different API response structures
         let productsData = [];

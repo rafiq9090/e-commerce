@@ -309,7 +309,7 @@ class OrderService {
 
 
   static async getAllOrders(filters = {}) {
-    const { status, startDate, endDate, customer, search } = filters;
+    const { status, startDate, endDate, customer, search, page = 1, limit = 20 } = filters;
     const whereClause = {};
 
     // Use 'search' or 'customer' for the generic search term
@@ -339,16 +339,31 @@ class OrderService {
       whereClause.OR = searchConditions;
     }
 
-    return await prisma.order.findMany({
-      where: whereClause,
-      include: {
-        user: { select: { email: true } },
-        address: true,
-        orderItems: true,
-        payment: true
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: whereClause,
+        include: {
+          user: { select: { email: true } },
+          address: true,
+          orderItems: true,
+          payment: true
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (parseInt(page, 10) - 1) * parseInt(limit, 10),
+        take: parseInt(limit, 10),
+      }),
+      prisma.order.count({ where: whereClause })
+    ]);
+
+    return {
+      orders,
+      pagination: {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        total,
+        pages: Math.ceil(total / parseInt(limit, 10))
+      }
+    };
   }
 
   static async countOrdersByPhone(phone, status) {

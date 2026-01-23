@@ -11,17 +11,29 @@ const ProductsPage = () => {
     sortBy: 'createdAt',
     order: 'desc'
   });
+  const [page, setPage] = useState(1);
+  const limit = 12;
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.category, filters.sortBy, filters.order]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await getProducts(filters);
+        if (page === 1) {
+          setLoading(true);
+          setError(null);
+        } else {
+          setLoadingMore(true);
+        }
+        const response = await getProducts({ ...filters, page, limit });
         
         // ✅ Handle different API response structures
         let productsData = [];
+        let pagination = null;
         
         if (Array.isArray(response.data)) {
           productsData = response.data;
@@ -32,19 +44,29 @@ const ProductsPage = () => {
         } else if (response?.data?.products) {
           productsData = response.data.products;
         }
+
+        pagination = response?.data?.pagination || response?.pagination || null;
         
-        setProducts(productsData || []);
+        setProducts((prev) => (page === 1 ? (productsData || []) : [...prev, ...(productsData || [])]));
+        if (pagination) {
+          setHasMore(pagination.page < pagination.pages);
+        } else {
+          setHasMore((productsData || []).length === limit);
+        }
         
       } catch (err) {
         console.error("Failed to fetch products:", err);
-        setError(err.response?.data?.message || err.message || "Could not load products.");
+        if (page === 1) {
+          setError(err.response?.data?.message || err.message || "Could not load products.");
+        }
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
     fetchProducts();
-  }, [filters]); // ✅ Re-fetch when filters change
+  }, [filters, page]); // ✅ Re-fetch when filters/page change
 
   // ✅ Better loading component
   const renderLoading = () => (
@@ -164,11 +186,17 @@ const ProductsPage = () => {
           </div>
           
           {/* Load More (if you have pagination) */}
-          {/* <div className="text-center mt-8">
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
-              Load More Products
-            </button>
-          </div> */}
+          {hasMore && (
+            <div className="text-center mt-8">
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={loadingMore}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading...' : 'Load More'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

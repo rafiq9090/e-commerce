@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import {
   LayoutDashboard,
   Package,
@@ -184,6 +184,8 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [counts, setCounts] = useState({ products: 0, orders: 0 });
   const [incompleteCount, setIncompleteCount] = useState(0);
   const [themeSettings, setThemeSettings] = useState({});
@@ -191,9 +193,9 @@ const AdminDashboard = () => {
   const fetchNotificationCounts = async () => {
     try {
       // 1. Order Badge: Show "New" orders since last view
-      const resOrders = await getAllOrders();
-      const allOrders = resOrders.data || resOrders;
-      const totalOrdersCount = allOrders.length;
+      const resOrders = await getAllOrders({ page: 1, limit: 1 });
+      const ordersPayload = resOrders.data || resOrders;
+      const totalOrdersCount = ordersPayload.pagination?.total || 0;
 
       const lastViewedCount = parseInt(localStorage.getItem('admin_last_viewed_order_count') || '0');
       // If server has more orders than we last saw, show the difference. Otherwise 0.
@@ -215,6 +217,21 @@ const AdminDashboard = () => {
     // Poll every 30s
     const interval = setInterval(fetchNotificationCounts, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => {
+      const nextIsMobile = mq.matches;
+      setIsMobile(nextIsMobile);
+      if (nextIsMobile) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    handleChange();
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
   }, []);
 
   useEffect(() => {
@@ -257,11 +274,14 @@ const AdminDashboard = () => {
   }, []);
 
   const handleTabChange = (tab) => {
-    setActiveTab(tab);
+    startTransition(() => {
+      setActiveTab(tab);
+    });
     if (tab === 'orders') {
       // Mark orders as seen
-      getAllOrders().then(res => {
-        const total = (res.data || res).length;
+      getAllOrders({ page: 1, limit: 1 }).then(res => {
+        const payload = res.data || res;
+        const total = payload.pagination?.total || 0;
         localStorage.setItem('admin_last_viewed_order_count', total.toString());
         setCounts(prev => ({ ...prev, orders: 0 }));
       });
@@ -294,15 +314,40 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-900 admin-theme" style={adminThemeVars}>
+    <div className="relative flex min-h-screen bg-gray-50 font-sans text-gray-900 admin-theme" style={adminThemeVars}>
       <style>{`
         .admin-theme .sidebar-shell { background-color: var(--admin-sidebar-bg); }
         .admin-theme .sidebar-item { color: var(--admin-sidebar-text); }
         .admin-theme .sidebar-item:hover { background-color: var(--admin-sidebar-hover-bg); color: var(--admin-sidebar-text); }
         .admin-theme .sidebar-item-active { background-color: var(--admin-sidebar-active-bg); color: var(--admin-sidebar-active-text); }
+        @media (max-width: 768px) {
+          .admin-theme table {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          .admin-theme table thead,
+          .admin-theme table tbody,
+          .admin-theme table tr,
+          .admin-theme table th,
+          .admin-theme table td {
+            white-space: nowrap;
+          }
+        }
       `}</style>
+      {isMobile && isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-10 bg-black/40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       {/* Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} sidebar-shell text-white transition-all duration-300 ease-in-out flex flex-col shadow-xl z-20`}>
+      <aside
+        className={`sidebar-shell text-white transition-all duration-300 ease-in-out flex flex-col shadow-xl z-20
+        ${isMobile ? 'fixed inset-y-0 left-0 w-64' : `${isSidebarOpen ? 'w-64' : 'w-20'} relative`}
+        ${isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') : ''}`}
+      >
         <div className="h-16 flex items-center justify-center border-b border-gray-800">
           {isSidebarOpen ? <h1 className="text-xl font-bold tracking-wider">ADMIN PANEL</h1> : <span className="font-bold text-xl">AP</span>}
         </div>
@@ -361,11 +406,14 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white shadow-sm flex items-center justify-between px-6 z-10">
+        <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 z-10">
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:text-gray-700 focus:outline-none">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
           <div className="flex items-center space-x-4">
+            {isPending && (
+              <span className="text-xs text-gray-400 hidden sm:inline">Loading...</span>
+            )}
             <div className="text-right hidden sm:block">
               <div className="text-sm font-semibold text-gray-800">{user?.name || 'Admin'}</div>
               <div className="text-xs text-gray-500">{user?.email || 'admin@example.com'}</div>
@@ -375,7 +423,7 @@ const AdminDashboard = () => {
             </div>
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-6">{renderContent()}</div>
+        <div className="flex-1 overflow-auto p-4 sm:p-6">{renderContent()}</div>
       </main>
     </div>
   );
@@ -677,30 +725,30 @@ const SiteContentManager = () => {
   const renderField = (label, key, type = 'TEXT', placeholder = '', isTextarea = false) => (
     <div className="flex flex-col space-y-2">
       <label className="text-sm font-semibold text-gray-700">{label}</label>
-      <div className="flex gap-2 items-center">
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
         {type === 'TEXT' ? (
           isTextarea || key.includes('description') || key.includes('text') && key.length > 20 ?
             <textarea
               value={editMap[key] || ''}
               onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
-              className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none min-h-[80px]"
+              className="w-full sm:flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none min-h-[80px]"
               placeholder={placeholder}
             /> :
             <input
               value={editMap[key] || ''}
               onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
-              className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
+              className="w-full sm:flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none"
               placeholder={placeholder}
             />
         ) : (
-          <div className="flex-1 flex gap-2">
+          <div className="w-full sm:flex-1 flex flex-col sm:flex-row gap-2">
             <input
               value={editMap[key] || ''}
               onChange={(e) => setEditMap({ ...editMap, [key]: e.target.value })}
-              className="flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none font-mono text-sm text-blue-600"
+              className="w-full sm:flex-1 border p-2 rounded focus:ring-2 focus:ring-blue-100 outline-none font-mono text-sm text-blue-600"
               placeholder="https://example.com/image.png"
             />
-            <label className={`cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded border flex items-center gap-2 text-xs font-bold ${uploadingKey === key ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <label className={`cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded border flex items-center gap-2 text-xs font-bold whitespace-nowrap justify-center h-10 ${uploadingKey === key ? 'opacity-50 cursor-not-allowed' : ''}`}>
               {uploadingKey === key ? '...' : <Upload size={14} />}
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, key)} disabled={uploadingKey === key} />
               Upload
@@ -709,7 +757,7 @@ const SiteContentManager = () => {
         )}
         <button
           onClick={() => handleSave(key, type)}
-          className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center h-10"
+          className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center h-10 w-full sm:w-12"
           title="Save"
         >
           <Save size={18} />
@@ -870,7 +918,7 @@ const SiteContentManager = () => {
           </div>
         </div>
         <div className="flex justify-end">
-          <button onClick={handleAddContent} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Add</button>
+          <button onClick={handleAddContent} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Add</button>
         </div>
       </div>
 
@@ -1204,8 +1252,8 @@ const BlocklistManager = () => {
       <h2 className="text-2xl font-bold">Blocked Users</h2>
 
       {/* Block Form */}
-      <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-4 items-end">
-        <div className="w-32">
+      <div className="bg-red-50 border border-red-100 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div className="w-full">
           <label className="block text-xs font-bold text-red-800 mb-1">Type</label>
           <select value={blockType} onChange={e => setBlockType(e.target.value)} className="w-full border p-2 rounded bg-white">
             <option value="EMAIL">Email</option>
@@ -1213,15 +1261,15 @@ const BlocklistManager = () => {
             <option value="IP">IP Address</option>
           </select>
         </div>
-        <div className="flex-1">
+        <div className="w-full">
           <label className="block text-xs font-bold text-red-800 mb-1">Value</label>
           <input value={newValue} onChange={e => setNewValue(e.target.value)} className="w-full border p-2 rounded" placeholder={blockType === 'IP' ? "192.168.1.1" : blockType === 'PHONE' ? "+88017..." : "email@example.com"} />
         </div>
-        <div className="flex-1">
+        <div className="w-full">
           <label className="block text-xs font-bold text-red-800 mb-1">Reason</label>
           <input value={reason} onChange={e => setReason(e.target.value)} className="w-full border p-2 rounded" placeholder="Spamming orders..." />
         </div>
-        <button onClick={handleBlock} className="bg-red-600 text-white px-6 py-2 rounded h-10 font-bold hover:bg-red-700">BLOCK</button>
+        <button onClick={handleBlock} className="bg-red-600 text-white px-6 py-2 rounded h-10 font-bold hover:bg-red-700 w-full">BLOCK</button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -1594,8 +1642,11 @@ const ProductsManager = () => {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
-  const [productCounts, setProductCounts] = useState({ ALL: 0, PUBLISHED: 0, DRAFT: 0, ARCHIVED: 0 });
   const [uploading, setUploading] = useState(false);
+  const [page, setPage] = useState(1);
+  const limit = 20;
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', slug: '', description: '', short_description: '', regular_price: '', sale_price: '',
@@ -1606,49 +1657,49 @@ const ProductsManager = () => {
   const [notifySubscribers, setNotifySubscribers] = useState(false);
 
 
+  useEffect(() => {
+    setPage(1);
+  }, [filterStatus, filterCategory, filterSupplier]);
+
   const fetchData = async () => {
-    setLoading(true);
+    if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
       const statusParam = filterStatus;
 
-      // Parallel fetch for main data and counts
+      // Parallel fetch for main data
       const [resProducts, resCats, resSuppliers] = await Promise.all([
         getProducts({
           status: statusParam,
           category: filterCategory || undefined,
-          supplier: filterSupplier || undefined
+          supplier: filterSupplier || undefined,
+          page,
+          limit
         }),
         getProdCategories(),
         getProdSuppliers()
       ]);
 
-      // Concurrent count fetching
-      const commonFilters = {
-        category: filterCategory || undefined,
-        supplier: filterSupplier || undefined
-      };
-
-      const [allC, pubC, dftC, arcC] = await Promise.all([
-        getProducts({ status: 'ALL', limit: 1, ...commonFilters }),
-        getProducts({ status: 'PUBLISHED', limit: 1, ...commonFilters }),
-        getProducts({ status: 'DRAFT', limit: 1, ...commonFilters }),
-        getProducts({ status: 'ARCHIVED', limit: 1, ...commonFilters })
-      ]);
-
-      setProducts(resProducts.data?.products || resProducts.products || []);
+      const productsData = resProducts.data?.products || resProducts.products || [];
+      setProducts((prev) => (page === 1 ? productsData : [...prev, ...productsData]));
+      const pagination = resProducts.data?.pagination || resProducts.pagination;
+      if (pagination) {
+        setHasMore(pagination.page < pagination.pages);
+      } else {
+        setHasMore(productsData.length === limit);
+      }
       setCategories(resCats.data || resCats || []);
       setSuppliers(resSuppliers.data || resSuppliers || []);
-
-      setProductCounts({
-        ALL: allC.pagination?.total || 0,
-        PUBLISHED: pubC.pagination?.total || 0,
-        DRAFT: dftC.pagination?.total || 0,
-        ARCHIVED: arcC.pagination?.total || 0
-      });
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { console.error(err); } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   };
 
-  useEffect(() => { fetchData(); }, [filterStatus, filterCategory, filterSupplier]);
+  useEffect(() => { fetchData(); }, [filterStatus, filterCategory, filterSupplier, page]);
 
   const handleInputChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
 
@@ -1772,16 +1823,16 @@ const ProductsManager = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
         <h2 className="text-2xl font-bold">Products</h2>
 
         {/* Status Filter Tabs */}
-        <div className="flex bg-gray-100 p-1 rounded-lg gap-1">
+        <div className="flex bg-gray-100 p-1 rounded-lg gap-1 overflow-x-auto scrollbar-hide w-full xl:w-auto">
           {['ALL', 'PUBLISHED', 'DRAFT', 'ARCHIVED'].map(status => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`relative px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${filterStatus === status
+              className={`relative px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap min-w-fit ${filterStatus === status
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
@@ -1792,11 +1843,11 @@ const ProductsManager = () => {
         </div>
 
         {/* Category & Supplier Filters */}
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 w-full xl:w-auto">
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-500"
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 w-full"
           >
             <option value="">All Categories</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -1805,14 +1856,14 @@ const ProductsManager = () => {
           <select
             value={filterSupplier}
             onChange={(e) => setFilterSupplier(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-500"
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 w-full"
           >
             <option value="">All Suppliers</option>
             {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
-        </div>
 
-        <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-4 py-2 rounded flex gap-2"><Plus size={18} /> Add</button>
+          <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-4 py-2 rounded flex gap-2 justify-center w-full"><Plus size={18} /> Add</button>
+        </div>
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-left">
@@ -1820,13 +1871,14 @@ const ProductsManager = () => {
             <tr><th className="p-4">Name</th><th className="p-4">Price</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
           </thead>
           <tbody className="divide-y">
-            {products.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-gray-500">No products found for this filter.</td></tr>}
-            {products.map(p => (
+            {loading && <tr><td colSpan="4" className="p-6 text-center text-gray-500">Loading products...</td></tr>}
+            {!loading && products.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-gray-500">No products found for this filter.</td></tr>}
+            {!loading && products.map(p => (
               <tr key={p.id}>
                 <td className="p-4">
                   <div className="flex items-center gap-3">
                     {p.images && p.images[0] ? (
-                      <img src={p.images[0].url} alt="" className="w-10 h-10 rounded object-cover border" />
+                      <img src={p.images[0].url} alt="" loading="lazy" decoding="async" className="w-10 h-10 rounded object-cover border" />
                     ) : (
                       <div className="w-10 h-10 rounded bg-gray-100 border flex items-center justify-center text-gray-400"><Package size={16} /></div>
                     )}
@@ -1857,6 +1909,21 @@ const ProductsManager = () => {
           </tbody>
         </table>
       </div>
+      {hasMore && (
+        <div className="text-center">
+          <button
+            onClick={() => {
+              const nextPage = page + 1;
+              setPage(nextPage);
+              fetchOrders(nextPage);
+            }}
+            disabled={loadingMore}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {loadingMore ? 'Loading...' : 'Load More'}
+          </button>
+        </div>
+      )}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl p-6 w-full max-w-3xl text-left max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -2253,28 +2320,52 @@ const OrdersManager = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
   const [sending, setSending] = useState(false);
+  const [page, setPage] = useState(1);
+  const limit = 25;
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const selectableOrders = orders.filter(o => !o.steadfastTrackingCode);
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (pageOverride) => {
+    const currentPage = pageOverride ?? page;
+    if (currentPage === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
       const res = await getAllOrders({
         status: filterStatus || undefined,
-        search: searchQuery || undefined
+        search: searchQuery || undefined,
+        page: currentPage,
+        limit
       });
-      const nextOrders = res.data || res;
-      setOrders(nextOrders);
+      const payload = res.data || res;
+      const nextOrders = payload.orders || [];
+      setOrders(prev => (currentPage === 1 ? nextOrders : [...prev, ...nextOrders]));
+      const pagination = payload.pagination;
+      if (pagination) {
+        setHasMore(pagination.page < pagination.pages);
+      } else {
+        setHasMore(nextOrders.length === limit);
+      }
       setSelectedOrderIds(prev => prev.filter(id => nextOrders.some(o => o.id === id && !o.steadfastTrackingCode)));
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { console.error(err); } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => {
     // minimal debounce for search
     const delayDebounceFn = setTimeout(() => {
-      fetchOrders();
+      setPage(1);
+      fetchOrders(1);
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [filterStatus, searchQuery]);
+
+  // No extra effect for page; load more handles it directly.
 
   const handleStatusChange = async (id, status, e) => {
     // Prevent row click propagation
@@ -2532,7 +2623,13 @@ const OrdersManager = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {orders.map(o => (
+            {loading && (
+              <tr><td colSpan="6" className="p-6 text-center text-gray-500">Loading orders...</td></tr>
+            )}
+            {!loading && orders.length === 0 && (
+              <tr><td colSpan="6" className="p-6 text-center text-gray-500">No orders found.</td></tr>
+            )}
+            {!loading && orders.map(o => (
               <tr
                 key={o.id}
                 onClick={() => handleRowClick(o)}
@@ -2586,6 +2683,17 @@ const OrdersManager = () => {
           </tbody>
         </table>
       </div>
+      {hasMore && (
+        <div className="text-center">
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={loadingMore}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {loadingMore ? 'Loading...' : 'Load More'}
+          </button>
+        </div>
+      )}
 
       {/* Order Details Modal */}
       {selectedOrder && (
